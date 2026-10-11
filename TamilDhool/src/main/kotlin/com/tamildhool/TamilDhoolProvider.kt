@@ -24,11 +24,11 @@ class TamilDhoolProvider : MainAPI() {
         MainPageData(name = "Vijay TV Shows", data = "posts?search=Vijay+TV+Show&categories_exclude=28&per_page=40", horizontalImages = true),
         MainPageData(name = "Zee Tamil Serials", data = "posts?search=Zee+Tamil+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
         MainPageData(name = "Zee Tamil Shows", data = "posts?search=Zee+Tamil+Show&categories_exclude=28&per_page=40", horizontalImages = true),
-        MainPageData(name = "Colors Tamil Serials", data = "posts?search=Colors+Tamil+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
-        MainPageData(name = "Colors Tamil Shows", data = "posts?search=Colors+Tamil+Show&categories_exclude=28&per_page=40", horizontalImages = true),
-        MainPageData(name = "Kalaignar TV Serials", data = "posts?search=Kalaignar+TV+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
-        MainPageData(name = "Kalaignar TV Shows", data = "posts?search=Kalaignar+TV+Show&categories_exclude=28&per_page=40", horizontalImages = true),
-        MainPageData(name = "Tamil Web Series", data = "posts?search=Web+Series&categories_exclude=28&per_page=40", horizontalImages = true),
+        // MainPageData(name = "Colors Tamil Serials", data = "posts?search=Colors+Tamil+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
+        // MainPageData(name = "Colors Tamil Shows", data = "posts?search=Colors+Tamil+Show&categories_exclude=28&per_page=40", horizontalImages = true),
+        // MainPageData(name = "Kalaignar TV Serials", data = "posts?search=Kalaignar+TV+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
+        // MainPageData(name = "Kalaignar TV Shows", data = "posts?search=Kalaignar+TV+Show&categories_exclude=28&per_page=40", horizontalImages = true),
+        // MainPageData(name = "Tamil Web Series", data = "posts?search=Web+Series&categories_exclude=28&per_page=40", horizontalImages = true),
         MainPageData(name = "News & Promos", data = "posts?categories=28&per_page=40", horizontalImages = true)
     )
 
