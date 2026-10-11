@@ -4,8 +4,10 @@ package com.tamildhool
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
 import com.lagradost.cloudstream3.utils.ExtractorLink
+import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.loadExtractor
+import com.lagradost.cloudstream3.utils.newExtractorLink
 
 object TamilDhoolExtractor {
 
@@ -61,15 +63,17 @@ object TamilDhoolExtractor {
                 if (loaded) {
                     foundAny = true
                 } else if (url.contains(".m3u8", ignoreCase = true) || url.contains(".mp4", ignoreCase = true)) {
+                    val isM3u8 = url.contains(".m3u8", ignoreCase = true)
                     callback(
-                        ExtractorLink(
+                        newExtractorLink(
                             source = "TamilDhool Direct",
-                            name = if (url.contains(".m3u8")) "HLS Stream" else "MP4 Video",
+                            name = if (isM3u8) "HLS Stream" else "MP4 Video",
                             url = url,
-                            referer = baseUrl,
-                            quality = Qualities.Unknown.value,
-                            isM3u8 = url.contains(".m3u8")
-                        )
+                            type = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                        ) {
+                            this.referer = baseUrl
+                            this.quality = Qualities.Unknown.value
+                        }
                     )
                     foundAny = true
                 }
@@ -109,7 +113,6 @@ object TamilDhoolExtractor {
             val res = app.get(url, referer = referer).text
 
             // Check for direct video qualities in VK player JS
-            // e.g. "url720":"https:\/\/..." or "url480":"https:\/\/..."
             val qualities = listOf(
                 "url1080" to Qualities.P1080.value,
                 "url720" to Qualities.P720.value,
@@ -123,15 +126,17 @@ object TamilDhoolExtractor {
                 val match = Regex("""\"$key\":\"(https?:[^\"]+)\"""").find(res)
                 if (match != null) {
                     val streamUrl = match.groupValues[1].replace("\\/", "/")
+                    val isM3u8 = streamUrl.contains(".m3u8", ignoreCase = true)
                     callback(
-                        ExtractorLink(
+                        newExtractorLink(
                             source = "PlayVK",
                             name = "VK Video ${quality}p",
                             url = streamUrl,
-                            referer = url,
-                            quality = quality,
-                            isM3u8 = streamUrl.contains(".m3u8")
-                        )
+                            type = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                        ) {
+                            this.referer = url
+                            this.quality = quality
+                        }
                     )
                     extracted = true
                 }
@@ -142,14 +147,15 @@ object TamilDhoolExtractor {
             if (hlsMatch != null) {
                 val hlsUrl = hlsMatch.groupValues[1].replace("\\/", "/")
                 callback(
-                    ExtractorLink(
+                    newExtractorLink(
                         source = "PlayVK HLS",
                         name = "VK Adaptive HLS",
                         url = hlsUrl,
-                        referer = url,
-                        quality = Qualities.Unknown.value,
-                        isM3u8 = true
-                    )
+                        type = ExtractorLinkType.M3U8
+                    ) {
+                        this.referer = url
+                        this.quality = Qualities.Unknown.value
+                    }
                 )
                 extracted = true
             }
