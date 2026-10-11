@@ -17,19 +17,19 @@ class TamilDhoolProvider : MainAPI() {
 
     // Configure all homescreen sections with horizontalImages = true for landscape card posters
     override val mainPage = mainPageOf(
-        MainPageData(name = "Latest Episodes", data = "posts?categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Sun TV Serials", data = "posts?search=Sun+TV+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Sun TV Shows", data = "posts?search=Sun+TV+Show&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Vijay TV Serials", data = "posts?search=Vijay+TV+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Vijay TV Shows", data = "posts?search=Vijay+TV+Show&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Zee Tamil Serials", data = "posts?search=Zee+Tamil+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Zee Tamil Shows", data = "posts?search=Zee+Tamil+Show&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Colors Tamil Serials", data = "posts?search=Colors+Tamil+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Colors Tamil Shows", data = "posts?search=Colors+Tamil+Show&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Kalaignar TV Serials", data = "posts?search=Kalaignar+TV+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Kalaignar TV Shows", data = "posts?search=Kalaignar+TV+Show&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "Tamil Web Series", data = "posts?search=Web+Series&categories_exclude=28&per_page=20", horizontalImages = true),
-        MainPageData(name = "News & Promos", data = "posts?categories=28&per_page=20", horizontalImages = true)
+        MainPageData(name = "Latest Episodes", data = "posts?categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Sun TV Serials", data = "posts?search=Sun+TV+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Sun TV Shows", data = "posts?search=Sun+TV+Show&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Vijay TV Serials", data = "posts?search=Vijay+TV+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Vijay TV Shows", data = "posts?search=Vijay+TV+Show&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Zee Tamil Serials", data = "posts?search=Zee+Tamil+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Zee Tamil Shows", data = "posts?search=Zee+Tamil+Show&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Colors Tamil Serials", data = "posts?search=Colors+Tamil+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Colors Tamil Shows", data = "posts?search=Colors+Tamil+Show&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Kalaignar TV Serials", data = "posts?search=Kalaignar+TV+Serial&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Kalaignar TV Shows", data = "posts?search=Kalaignar+TV+Show&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "Tamil Web Series", data = "posts?search=Web+Series&categories_exclude=28&per_page=40", horizontalImages = true),
+        MainPageData(name = "News & Promos", data = "posts?categories=28&per_page=40", horizontalImages = true)
     )
 
     private val defaultHeaders = mapOf(
@@ -67,7 +67,7 @@ class TamilDhoolProvider : MainAPI() {
         // Calculate hasNext using official WordPress REST API total pages count
         val hasNext = when {
             totalPages != null -> page < totalPages
-            posts.size >= 20 -> true
+            posts.size >= 40 -> true
             else -> false
         }
 
@@ -78,7 +78,9 @@ class TamilDhoolProvider : MainAPI() {
             posts.filter { !it.isPromoCategory && !it.isPromoOnly }
         }
 
+        // Deduplicate so each show/serial card appears only once per row
         val items = filteredPosts.mapNotNull { it.toSearchResponse() }
+            .distinctBy { it.name }
 
         // Always return HomePageList with isHorizontalImages = true for landscape card rendering
         return newHomePageResponse(
@@ -89,12 +91,12 @@ class TamilDhoolProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val encoded = URLEncoder.encode(query, "UTF-8")
-        val endpoint = "$mainUrl/wp-json/wp/v2/posts?search=$encoded&_embed=1&per_page=30"
+        val endpoint = "$mainUrl/wp-json/wp/v2/posts?search=$encoded&_embed=1&per_page=40"
         val posts = fetchPosts(endpoint)
 
         return posts.mapNotNull { post ->
             post.toSearchResponse()
-        }
+        }.distinctBy { it.name }
     }
 
     override suspend fun load(url: String): LoadResponse {
