@@ -146,6 +146,38 @@ data class WpPost(
             return if (text.isNotBlank()) text else cleanTitle
         }
 
+    val showCategory: WpTerm?
+        get() {
+            val catTerms = embedded?.terms?.firstOrNull() ?: return null
+            // Select the specific show sub-category (exclude general top-level channel categories)
+            val specificCat = catTerms.firstOrNull { term ->
+                val slug = term.slug?.lowercase() ?: ""
+                slug != "sun-tv" && slug != "sun-tv-serial" && slug != "sun-tv-show" &&
+                slug != "vijay-tv" && slug != "vijay-tv-serial" && slug != "vijay-tv-show" &&
+                slug != "zee-tamil" && slug != "zee-tamil-serial" && slug != "zee-tamil-show" &&
+                slug != "colors-tamil" && slug != "colors-tamil-serial" && slug != "colors-tamil-show" &&
+                slug != "kalaignar-tv" && slug != "kalaignar-tv-serial" && slug != "kalaignar-tv-show" &&
+                slug != "uncategorized"
+            }
+            return specificCat ?: catTerms.firstOrNull()
+        }
+
+    val isPromoCategory: Boolean
+        get() {
+            val slug = showCategory?.slug?.lowercase() ?: ""
+            return slug == "news-gossips" ||
+                    categories?.any { it == 28 } == true ||
+                    link?.contains("/news-gossips/") == true
+        }
+
+    val isSingleSpecialProgram: Boolean
+        get() {
+            val slug = showCategory?.slug?.lowercase() ?: ""
+            return slug.contains("special-program") ||
+                    slug.contains("special-show") ||
+                    slug.contains("special-shows")
+        }
+
     val isPromoOnly: Boolean
         get() {
             val titleLower = cleanTitle.lowercase()
@@ -156,11 +188,25 @@ data class WpPost(
                     titleLower.contains("டிரெய்லர்")
         }
 
+    val isStandaloneItem: Boolean
+        get() = isPromoCategory || isSingleSpecialProgram || isPromoOnly
+
     val isStandalone: Boolean
-        get() = isPromoOnly
+        get() = isStandaloneItem
+
+    val resolvedShowTitle: String
+        get() {
+            if (isStandaloneItem) return cleanTitle
+            val catName = showCategory?.name?.let { org.jsoup.Jsoup.parse(it).text() }
+            return if (!catName.isNullOrBlank() && !isSingleSpecialProgram && !isPromoCategory) {
+                catName
+            } else {
+                pureShowTitle
+            }
+        }
 
     val homeCardTitle: String
-        get() = if (isPromoOnly) cleanTitle else pureShowTitle
+        get() = if (isStandaloneItem) cleanTitle else resolvedShowTitle
 
     val posterUrl: String?
         get() {

@@ -17,18 +17,19 @@ class TamilDhoolProvider : MainAPI() {
 
     // Configure all homescreen sections with horizontalImages = true for landscape card posters
     override val mainPage = mainPageOf(
-        MainPageData(name = "Latest Episodes", data = "posts?per_page=20", horizontalImages = true),
-        MainPageData(name = "Sun TV Serials", data = "posts?search=Sun+TV+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Sun TV Shows", data = "posts?search=Sun+TV+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Vijay TV Serials", data = "posts?search=Vijay+TV+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Vijay TV Shows", data = "posts?search=Vijay+TV+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Zee Tamil Serials", data = "posts?search=Zee+Tamil+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Zee Tamil Shows", data = "posts?search=Zee+Tamil+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Colors Tamil Serials", data = "posts?search=Colors+Tamil+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Colors Tamil Shows", data = "posts?search=Colors+Tamil+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Kalaignar TV Serials", data = "posts?search=Kalaignar+TV+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Kalaignar TV Shows", data = "posts?search=Kalaignar+TV+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Tamil Web Series", data = "posts?search=Web+Series&per_page=20", horizontalImages = true)
+        MainPageData(name = "Latest Episodes", data = "posts?categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Sun TV Serials", data = "posts?search=Sun+TV+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Sun TV Shows", data = "posts?search=Sun+TV+Show&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Vijay TV Serials", data = "posts?search=Vijay+TV+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Vijay TV Shows", data = "posts?search=Vijay+TV+Show&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Zee Tamil Serials", data = "posts?search=Zee+Tamil+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Zee Tamil Shows", data = "posts?search=Zee+Tamil+Show&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Colors Tamil Serials", data = "posts?search=Colors+Tamil+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Colors Tamil Shows", data = "posts?search=Colors+Tamil+Show&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Kalaignar TV Serials", data = "posts?search=Kalaignar+TV+Serial&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Kalaignar TV Shows", data = "posts?search=Kalaignar+TV+Show&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "Tamil Web Series", data = "posts?search=Web+Series&categories_exclude=28&per_page=20", horizontalImages = true),
+        MainPageData(name = "News & Promos", data = "posts?categories=28&per_page=20", horizontalImages = true)
     )
 
     private val defaultHeaders = mapOf(
@@ -70,7 +71,14 @@ class TamilDhoolProvider : MainAPI() {
             else -> false
         }
 
-        val items = posts.mapNotNull { it.toSearchResponse() }
+        val isPromoSection = request.data.contains("categories=28")
+        val filteredPosts = if (isPromoSection) {
+            posts
+        } else {
+            posts.filter { !it.isPromoCategory && !it.isPromoOnly }
+        }
+
+        val items = filteredPosts.mapNotNull { it.toSearchResponse() }
 
         // Always return HomePageList with isHorizontalImages = true for landscape card rendering
         return newHomePageResponse(
@@ -109,13 +117,14 @@ class TamilDhoolProvider : MainAPI() {
 
         // 3. If post successfully retrieved from WordPress REST API
         if (post != null) {
-            val title = if (post.isPromoOnly) post.cleanTitle else post.pureShowTitle
+            val title = if (post.isStandaloneItem) post.cleanTitle else post.resolvedShowTitle
             val poster = post.posterUrl
             val plot = post.excerpt?.rendered?.let { Jsoup.parse(it).text() }
             val year = post.date?.take(4)?.toIntOrNull()
 
-            // 1. If it is an individual promo or teaser, treat as single video
-            if (post.isPromoOnly) {
+            // 1. If it is an individual promo or special program (e.g. sun-special-program, news-gossips)
+            // treat as a single standalone playable video
+            if (post.isStandaloneItem) {
                 val singleEpisode = newEpisode(post.link ?: url) {
                     this.name = post.cleanTitle
                     this.posterUrl = poster
@@ -129,9 +138,10 @@ class TamilDhoolProvider : MainAPI() {
                 }
             }
 
-            // 2. For serials and recurring shows, fetch episodes specifically for THIS show
+            // 2. For serials and recurring shows, fetch episodes specifically for THIS show category!
             val episodes = mutableListOf<Episode>()
-            val showName = post.pureShowTitle
+            val categoryId = post.showCategory?.id ?: post.categories?.lastOrNull()?.toLong()
+            val showName = post.resolvedShowTitle
 
             val currentEpisode = newEpisode(post.link ?: url) {
                 val epDate = post.displayDate
@@ -146,23 +156,16 @@ class TamilDhoolProvider : MainAPI() {
                 this.data = post.link ?: url
             }
 
-            try {
-                // Search specifically for this exact show name to avoid unrelated category mix-ups
-                val encodedShow = URLEncoder.encode(showName, "UTF-8")
-                val searchEndpoint = "$mainUrl/wp-json/wp/v2/posts?search=$encodedShow&per_page=100&_embed=1&orderby=date&order=desc"
-                val searchResponse = app.get(searchEndpoint, headers = defaultHeaders)
-                if (searchResponse.code in 200..299) {
-                    val foundPosts = parseJson<List<WpPost>>(searchResponse.text)
+            // TamilDhool organizes series under specific show subcategories (e.g., kitchen-galatta, singappenne)
+            if (categoryId != null && categoryId != 28L) {
+                try {
+                    val catEndpoint = "$mainUrl/wp-json/wp/v2/posts?categories=$categoryId&categories_exclude=28&per_page=100&_embed=1&orderby=date&order=desc"
+                    val catResponse = app.get(catEndpoint, headers = defaultHeaders)
+                    if (catResponse.code in 200..299) {
+                        val catPosts = parseJson<List<WpPost>>(catResponse.text)
+                        val matchingPosts = catPosts.filter { !it.isPromoCategory && !it.isPromoOnly }
+                            .sortedByDescending { it.date ?: "" }
 
-                    // Strict filter: must match the show name and NOT be a promo
-                    val matchingPosts = foundPosts.filter { p ->
-                        !p.isPromoOnly && (
-                            p.pureShowTitle.equals(showName, ignoreCase = true) ||
-                            p.cleanTitle.contains(showName, ignoreCase = true)
-                        )
-                    }.sortedByDescending { it.date ?: "" }
-
-                    if (matchingPosts.isNotEmpty()) {
                         matchingPosts.forEachIndexed { index, p ->
                             val epDate = p.displayDate
                             val epDay = Regex("""\b(?:Day\s*\d+)\b""", RegexOption.IGNORE_CASE).find(p.cleanTitle)?.value
@@ -182,51 +185,48 @@ class TamilDhoolProvider : MainAPI() {
                             )
                         }
                     }
-                }
-            } catch (_: Exception) {
-                // Ignore search error and fallback
+                } catch (_: Exception) {}
             }
 
-            // Fallback: If show search yielded no episodes, query category but strictly filter by show name
+            // Fallback: If show category fetch returned no episodes, search specifically for this show name
             if (episodes.isEmpty()) {
-                val categoryId = post.categories?.lastOrNull()
-                if (categoryId != null) {
-                    try {
-                        val catEndpoint = "$mainUrl/wp-json/wp/v2/posts?categories=$categoryId&per_page=100&_embed=1&orderby=date&order=desc"
-                        val catResponse = app.get(catEndpoint, headers = defaultHeaders)
-                        if (catResponse.code in 200..299) {
-                            val catPosts = parseJson<List<WpPost>>(catResponse.text)
-                            val matchingPosts = catPosts.filter { p ->
-                                !p.isPromoOnly && (
-                                    p.pureShowTitle.equals(showName, ignoreCase = true) ||
-                                    p.cleanTitle.contains(showName, ignoreCase = true)
-                                )
-                            }.sortedByDescending { it.date ?: "" }
+                try {
+                    val encodedShow = URLEncoder.encode(showName, "UTF-8")
+                    val searchEndpoint = "$mainUrl/wp-json/wp/v2/posts?search=$encodedShow&categories_exclude=28&per_page=100&_embed=1&orderby=date&order=desc"
+                    val searchResponse = app.get(searchEndpoint, headers = defaultHeaders)
+                    if (searchResponse.code in 200..299) {
+                        val foundPosts = parseJson<List<WpPost>>(searchResponse.text)
+                        val matchingPosts = foundPosts.filter { p ->
+                            !p.isPromoCategory && !p.isPromoOnly && (
+                                p.resolvedShowTitle.equals(showName, ignoreCase = true) ||
+                                p.pureShowTitle.equals(showName, ignoreCase = true) ||
+                                p.cleanTitle.contains(showName, ignoreCase = true)
+                            )
+                        }.sortedByDescending { it.date ?: "" }
 
-                            matchingPosts.forEachIndexed { index, p ->
-                                val epDate = p.displayDate
-                                val epDay = Regex("""\b(?:Day\s*\d+)\b""", RegexOption.IGNORE_CASE).find(p.cleanTitle)?.value
-                                val epTitle = when {
-                                    epDay != null && epDate.isNotBlank() -> "$epDate ($epDay)"
-                                    epDate.isNotBlank() -> epDate
-                                    epDay != null -> epDay
-                                    else -> "Episode ${matchingPosts.size - index}"
-                                }
-                                episodes.add(
-                                    newEpisode(p.link ?: "$mainUrl/?p=${p.id}") {
-                                        this.name = epTitle
-                                        this.posterUrl = p.posterUrl
-                                        this.data = p.link ?: "$mainUrl/?p=${p.id}"
-                                        this.episode = matchingPosts.size - index
-                                    }
-                                )
+                        matchingPosts.forEachIndexed { index, p ->
+                            val epDate = p.displayDate
+                            val epDay = Regex("""\b(?:Day\s*\d+)\b""", RegexOption.IGNORE_CASE).find(p.cleanTitle)?.value
+                            val epTitle = when {
+                                epDay != null && epDate.isNotBlank() -> "$epDate ($epDay)"
+                                epDate.isNotBlank() -> epDate
+                                epDay != null -> epDay
+                                else -> "Episode ${matchingPosts.size - index}"
                             }
+                            episodes.add(
+                                newEpisode(p.link ?: "$mainUrl/?p=${p.id}") {
+                                    this.name = epTitle
+                                    this.posterUrl = p.posterUrl
+                                    this.data = p.link ?: "$mainUrl/?p=${p.id}"
+                                    this.episode = matchingPosts.size - index
+                                }
+                            )
                         }
-                    } catch (_: Exception) {}
-                }
+                    }
+                } catch (_: Exception) {}
             }
 
-            // Guarantee current episode is in list
+            // Guarantee current episode is in list (at top if not already present)
             if (episodes.isEmpty()) {
                 episodes.add(currentEpisode)
             } else {
