@@ -116,22 +116,28 @@ data class WpPost(
                 ),
                 " "
             )
-            text = text.replace(Regex("""\b(?:Episode|Epi)\s*\d+\b""", RegexOption.IGNORE_CASE), " ")
 
-            // 2. Remove channel and serial/show keywords (case-insensitive)
+            // 2. Remove episode / day / part numbers
+            text = text.replace(Regex("""\b(?:Episode|Epi|Ep)\s*\.?\s*\d+\b""", RegexOption.IGNORE_CASE), " ")
+            text = text.replace(Regex("""\b(?:Day)\s*\.?\s*\d+\b""", RegexOption.IGNORE_CASE), " ")
+            text = text.replace(Regex("""\b(?:Part)\s*\.?\s*\d+\b""", RegexOption.IGNORE_CASE), " ")
+
+            // 3. Remove channel, serial/show keywords and special modifiers (case-insensitive)
             val channelPatterns = listOf(
                 """(?:Sun|Vijay|Star\s*Vijay|Zee\s*Tamil|Colors\s*Tamil|Kalaignar|Jaya|Raj|Polimer)\s*TV\s*(?:Serial|Show|Reality\s*Show)?""",
                 """(?:Sun|Vijay|Zee|Colors|Kalaignar)\s*(?:Serial|Show)""",
                 """(?:TV\s*)?(?:Serial|Show|Reality\s*Show)""",
                 """(?:சன்|விஜய்|ஜீ|கலர்ஸ்|கலைஞர்)\s*(?:டிவி)?\s*(?:சீரியல்|நிகழ்ச்சி)?""",
-                """(?:Watch\s*Online|Full\s*Episode|Today\s*Episode|Promo|Online)"""
+                """(?:Special\s*Episode|Mega\s*Episode|Maha\s*Sangamam|Special\s*Show|Special)""",
+                """(?:Watch\s*Online|Full\s*Episode|Today\s*Episode|Online)"""
             )
             for (p in channelPatterns) {
                 text = text.replace(Regex("""(?i)\b$p\b"""), " ")
             }
 
-            // 3. Clean up any trailing/leading symbols, hyphens, colons, brackets, extra whitespace
-            text = text.replace(Regex("""[\[\]\(\)]"""), " ")
+            // 4. Normalize dashes and clean symbols/whitespace
+            text = text.replace('–', '-').replace('—', '-')
+                .replace(Regex("""[\[\]\(\)]"""), " ")
                 .replace(Regex("""[\s\-_|–—:]+$"""), "")
                 .replace(Regex("""^[\s\-_|–—:]+"""), "")
                 .replace(Regex("""\s{2,}"""), " ")
@@ -140,24 +146,21 @@ data class WpPost(
             return if (text.isNotBlank()) text else cleanTitle
         }
 
-    val isStandalone: Boolean
+    val isPromoOnly: Boolean
         get() {
             val titleLower = cleanTitle.lowercase()
             return titleLower.contains("promo") ||
                     titleLower.contains("trailer") ||
                     titleLower.contains("teaser") ||
-                    titleLower.contains("movie") ||
-                    titleLower.contains("audio launch") ||
-                    titleLower.contains("interview") ||
-                    titleLower.contains("special") ||
-                    titleLower.contains("event") ||
-                    titleLower.contains("press meet") ||
                     titleLower.contains("ப்ரோமோ") ||
                     titleLower.contains("டிரெய்லர்")
         }
 
+    val isStandalone: Boolean
+        get() = isPromoOnly
+
     val homeCardTitle: String
-        get() = if (isStandalone) cleanTitle else pureShowTitle
+        get() = if (isPromoOnly) cleanTitle else pureShowTitle
 
     val posterUrl: String?
         get() {

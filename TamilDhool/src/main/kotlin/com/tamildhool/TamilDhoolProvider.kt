@@ -17,18 +17,18 @@ class TamilDhoolProvider : MainAPI() {
 
     // Configure all homescreen sections with horizontalImages = true for landscape card posters
     override val mainPage = mainPageOf(
-        MainPageData(name = "Latest Episodes (சமீபத்தியவை)", data = "posts?per_page=20", horizontalImages = true),
-        MainPageData(name = "Sun TV Serials (சன் டிவி சீரியல்)", data = "posts?search=Sun+TV+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Sun TV Shows (சன் டிவி நிகழ்ச்சிகள்)", data = "posts?search=Sun+TV+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Vijay TV Serials (விஜய் டிவி சீரியல்)", data = "posts?search=Vijay+TV+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Vijay TV Shows (விஜய் டிவி நிகழ்ச்சிகள்)", data = "posts?search=Vijay+TV+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Zee Tamil Serials (ஜீ தமிழ் சீரியல்)", data = "posts?search=Zee+Tamil+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Zee Tamil Shows (ஜீ தமிழ் நிகழ்ச்சிகள்)", data = "posts?search=Zee+Tamil+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Colors Tamil Serials (கலர்ஸ் தமிழ் சீரியல்)", data = "posts?search=Colors+Tamil+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Colors Tamil Shows (கலர்ஸ் தமிழ் நிகழ்ச்சிகள்)", data = "posts?search=Colors+Tamil+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Kalaignar TV Serials (கலைஞர் டிவி சீரியல்)", data = "posts?search=Kalaignar+TV+Serial&per_page=20", horizontalImages = true),
-        MainPageData(name = "Kalaignar TV Shows (கலைஞர் டிவி நிகழ்ச்சிகள்)", data = "posts?search=Kalaignar+TV+Show&per_page=20", horizontalImages = true),
-        MainPageData(name = "Tamil Web Series (வலைத் தொடர்)", data = "posts?search=Web+Series&per_page=20", horizontalImages = true)
+        MainPageData(name = "Latest Episodes", data = "posts?per_page=20", horizontalImages = true),
+        MainPageData(name = "Sun TV Serials", data = "posts?search=Sun+TV+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Sun TV Shows", data = "posts?search=Sun+TV+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Vijay TV Serials", data = "posts?search=Vijay+TV+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Vijay TV Shows", data = "posts?search=Vijay+TV+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Zee Tamil Serials", data = "posts?search=Zee+Tamil+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Zee Tamil Shows", data = "posts?search=Zee+Tamil+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Colors Tamil Serials", data = "posts?search=Colors+Tamil+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Colors Tamil Shows", data = "posts?search=Colors+Tamil+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Kalaignar TV Serials", data = "posts?search=Kalaignar+TV+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Kalaignar TV Shows", data = "posts?search=Kalaignar+TV+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Tamil Web Series", data = "posts?search=Web+Series&per_page=20", horizontalImages = true)
     )
 
     private val defaultHeaders = mapOf(
@@ -109,14 +109,13 @@ class TamilDhoolProvider : MainAPI() {
 
         // 3. If post successfully retrieved from WordPress REST API
         if (post != null) {
-            val title = if (post.isStandalone) post.cleanTitle else post.pureShowTitle
+            val title = if (post.isPromoOnly) post.cleanTitle else post.pureShowTitle
             val poster = post.posterUrl
             val plot = post.excerpt?.rendered?.let { Jsoup.parse(it).text() }
             val year = post.date?.take(4)?.toIntOrNull()
 
-            // 1. If it is an individual standalone item (Promo, Trailer, Movie, Special Event)
-            // do NOT fetch unrelated category posts. Return as a single playable video.
-            if (post.isStandalone) {
+            // 1. If it is an individual promo or teaser, treat as single video
+            if (post.isPromoOnly) {
                 val singleEpisode = newEpisode(post.link ?: url) {
                     this.name = post.cleanTitle
                     this.posterUrl = poster
@@ -135,7 +134,14 @@ class TamilDhoolProvider : MainAPI() {
             val showName = post.pureShowTitle
 
             val currentEpisode = newEpisode(post.link ?: url) {
-                this.name = post.displayDate.ifBlank { "Latest Episode" }
+                val epDate = post.displayDate
+                val epDay = Regex("""\b(?:Day\s*\d+)\b""", RegexOption.IGNORE_CASE).find(post.cleanTitle)?.value
+                this.name = when {
+                    epDay != null && epDate.isNotBlank() -> "$epDate ($epDay)"
+                    epDate.isNotBlank() -> epDate
+                    epDay != null -> epDay
+                    else -> "Latest Episode"
+                }
                 this.posterUrl = poster
                 this.data = post.link ?: url
             }
@@ -150,7 +156,7 @@ class TamilDhoolProvider : MainAPI() {
 
                     // Strict filter: must match the show name and NOT be a promo
                     val matchingPosts = foundPosts.filter { p ->
-                        !p.isStandalone && (
+                        !p.isPromoOnly && (
                             p.pureShowTitle.equals(showName, ignoreCase = true) ||
                             p.cleanTitle.contains(showName, ignoreCase = true)
                         )
@@ -159,9 +165,16 @@ class TamilDhoolProvider : MainAPI() {
                     if (matchingPosts.isNotEmpty()) {
                         matchingPosts.forEachIndexed { index, p ->
                             val epDate = p.displayDate
+                            val epDay = Regex("""\b(?:Day\s*\d+)\b""", RegexOption.IGNORE_CASE).find(p.cleanTitle)?.value
+                            val epTitle = when {
+                                epDay != null && epDate.isNotBlank() -> "$epDate ($epDay)"
+                                epDate.isNotBlank() -> epDate
+                                epDay != null -> epDay
+                                else -> "Episode ${matchingPosts.size - index}"
+                            }
                             episodes.add(
                                 newEpisode(p.link ?: "$mainUrl/?p=${p.id}") {
-                                    this.name = epDate.ifBlank { "Episode ${matchingPosts.size - index}" }
+                                    this.name = epTitle
                                     this.posterUrl = p.posterUrl
                                     this.data = p.link ?: "$mainUrl/?p=${p.id}"
                                     this.episode = matchingPosts.size - index
@@ -184,7 +197,7 @@ class TamilDhoolProvider : MainAPI() {
                         if (catResponse.code in 200..299) {
                             val catPosts = parseJson<List<WpPost>>(catResponse.text)
                             val matchingPosts = catPosts.filter { p ->
-                                !p.isStandalone && (
+                                !p.isPromoOnly && (
                                     p.pureShowTitle.equals(showName, ignoreCase = true) ||
                                     p.cleanTitle.contains(showName, ignoreCase = true)
                                 )
@@ -192,9 +205,16 @@ class TamilDhoolProvider : MainAPI() {
 
                             matchingPosts.forEachIndexed { index, p ->
                                 val epDate = p.displayDate
+                                val epDay = Regex("""\b(?:Day\s*\d+)\b""", RegexOption.IGNORE_CASE).find(p.cleanTitle)?.value
+                                val epTitle = when {
+                                    epDay != null && epDate.isNotBlank() -> "$epDate ($epDay)"
+                                    epDate.isNotBlank() -> epDate
+                                    epDay != null -> epDay
+                                    else -> "Episode ${matchingPosts.size - index}"
+                                }
                                 episodes.add(
                                     newEpisode(p.link ?: "$mainUrl/?p=${p.id}") {
-                                        this.name = epDate.ifBlank { "Episode ${matchingPosts.size - index}" }
+                                        this.name = epTitle
                                         this.posterUrl = p.posterUrl
                                         this.data = p.link ?: "$mainUrl/?p=${p.id}"
                                         this.episode = matchingPosts.size - index
@@ -333,17 +353,23 @@ class TamilDhoolProvider : MainAPI() {
 
     private fun cleanShowTitleFromText(raw: String): String {
         var text = raw.replace(Regex("""\b\d{1,2}[-./]\d{1,2}[-./]\d{2,4}\b"""), " ")
+        text = text.replace(Regex("""\b(?:Episode|Epi|Ep)\s*\.?\s*\d+\b""", RegexOption.IGNORE_CASE), " ")
+        text = text.replace(Regex("""\b(?:Day)\s*\.?\s*\d+\b""", RegexOption.IGNORE_CASE), " ")
+        text = text.replace(Regex("""\b(?:Part)\s*\.?\s*\d+\b""", RegexOption.IGNORE_CASE), " ")
+
         val channelPatterns = listOf(
             """(?:Sun|Vijay|Star\s*Vijay|Zee\s*Tamil|Colors\s*Tamil|Kalaignar|Jaya|Raj|Polimer)\s*TV\s*(?:Serial|Show|Reality\s*Show)?""",
             """(?:Sun|Vijay|Zee|Colors|Kalaignar)\s*(?:Serial|Show)""",
             """(?:TV\s*)?(?:Serial|Show|Reality\s*Show)""",
             """(?:சன்|விஜய்|ஜீ|கலர்ஸ்|கலைஞர்)\s*(?:டிவி)?\s*(?:சீரியல்|நிகழ்ச்சி)?""",
-            """(?:Watch\s*Online|Full\s*Episode|Today\s*Episode|Promo|Online)"""
+            """(?:Special\s*Episode|Mega\s*Episode|Maha\s*Sangamam|Special\s*Show|Special)""",
+            """(?:Watch\s*Online|Full\s*Episode|Today\s*Episode|Online)"""
         )
         for (p in channelPatterns) {
             text = text.replace(Regex("""(?i)\b$p\b"""), " ")
         }
-        return text.replace(Regex("""[\[\]\(\)]"""), " ")
+        return text.replace('–', '-').replace('—', '-')
+            .replace(Regex("""[\[\]\(\)]"""), " ")
             .replace(Regex("""[\s\-_|–—:]+$"""), "")
             .replace(Regex("""^[\s\-_|–—:]+"""), "")
             .replace(Regex("""\s{2,}"""), " ")
