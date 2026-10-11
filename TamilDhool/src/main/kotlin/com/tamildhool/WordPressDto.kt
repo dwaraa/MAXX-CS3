@@ -9,8 +9,29 @@ data class WpRendered(
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
+data class WpMediaSize(
+    @JsonProperty("source_url") val sourceUrl: String? = null,
+    @JsonProperty("width") val width: Int? = null,
+    @JsonProperty("height") val height: Int? = null
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class WpMediaSizes(
+    @JsonProperty("large") val large: WpMediaSize? = null,
+    @JsonProperty("medium_large") val mediumLarge: WpMediaSize? = null,
+    @JsonProperty("full") val full: WpMediaSize? = null,
+    @JsonProperty("medium") val medium: WpMediaSize? = null
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class WpMediaDetails(
+    @JsonProperty("sizes") val sizes: WpMediaSizes? = null
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 data class WpFeaturedMedia(
-    @JsonProperty("source_url") val sourceUrl: String? = null
+    @JsonProperty("source_url") val sourceUrl: String? = null,
+    @JsonProperty("media_details") val mediaDetails: WpMediaDetails? = null
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -48,7 +69,17 @@ data class WpPost(
 
     val posterUrl: String?
         get() {
-            return embedded?.featuredMedia?.firstOrNull()?.sourceUrl
+            // Prioritize landscape sizes from media details if available
+            val media = embedded?.featuredMedia?.firstOrNull()
+            val sizeUrl = media?.mediaDetails?.sizes?.let { s ->
+                s.large?.sourceUrl
+                    ?: s.mediumLarge?.sourceUrl
+                    ?: s.full?.sourceUrl
+                    ?: s.medium?.sourceUrl
+            }
+
+            return sizeUrl
+                ?: media?.sourceUrl
                 ?: jetpackFeaturedMediaUrl
                 ?: extractFirstImg(content?.rendered)
         }
@@ -56,10 +87,28 @@ data class WpPost(
     private fun extractFirstImg(html: String?): String? {
         if (html.isNullOrBlank()) return null
         return try {
-            val doc = org.jsoup.Jsoup.parse(html)
-            doc.selectFirst("img")?.attr("abs:src")?.ifBlank {
-                doc.selectFirst("img")?.attr("src")
+            // 1. Check for YouTube embed thumbnail (16:9 landscape)
+            val ytMatch = Regex("""(?:youtube\.com/embed/|youtu\.be/)([a-zA-Z0-9_-]{11})""").find(html)
+            if (ytMatch != null) {
+                val videoId = ytMatch.groupValues[1]
+                return "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
             }
+
+            // 2. Extract first valid content image
+            val doc = org.jsoup.Jsoup.parse(html)
+            for (img in doc.select("img")) {
+                val src = img.attr("abs:src").ifBlank {
+                    img.attr("src").ifBlank {
+                        img.attr("data-src").ifBlank {
+                            img.attr("data-lazy-src")
+                        }
+                    }
+                }
+                if (src.isNotBlank() && !src.contains("gravatar") && !src.contains("emoji")) {
+                    return src
+                }
+            }
+            null
         } catch (_: Exception) {
             null
         }

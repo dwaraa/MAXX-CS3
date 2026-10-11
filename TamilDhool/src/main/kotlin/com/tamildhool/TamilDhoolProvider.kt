@@ -15,16 +15,16 @@ class TamilDhoolProvider : MainAPI() {
     override val hasMainPage = true
     override val hasQuickSearch = true
 
-    // Main page categories powered by WordPress REST API
+    // Configure all homescreen sections with horizontalImages = true for landscape card posters
     override val mainPage = mainPageOf(
-        "posts?per_page=20" to "Latest Episodes (சமீபத்தியவை)",
-        "posts?search=Sun+TV&per_page=20" to "Sun TV Serials (சன் டிவி)",
-        "posts?search=Vijay+TV&per_page=20" to "Vijay TV Serials (விஜய் டிவி)",
-        "posts?search=Zee+Tamil&per_page=20" to "Zee Tamil Serials (ஜீ தமிழ்)",
-        "posts?search=Colors+Tamil&per_page=20" to "Colors Tamil (கலர்ஸ் தமிழ்)",
-        "posts?search=Kalaignar+TV&per_page=20" to "Kalaignar TV (கலைஞர் டிவி)",
-        "posts?search=Web+Series&per_page=20" to "Tamil Web Series (வலைத் தொடர்)",
-        "posts?search=Show&per_page=20" to "TV Shows & Reality (நிகழ்ச்சிகள்)"
+        MainPageData(name = "Latest Episodes (சமீபத்தியவை)", data = "posts?per_page=20", horizontalImages = true),
+        MainPageData(name = "Sun TV Serials (சன் டிவி)", data = "posts?search=Sun+TV&per_page=20", horizontalImages = true),
+        MainPageData(name = "Vijay TV Serials (விஜய் டிவி)", data = "posts?search=Vijay+TV&per_page=20", horizontalImages = true),
+        MainPageData(name = "Zee Tamil Serials (ஜீ தமிழ்)", data = "posts?search=Zee+Tamil&per_page=20", horizontalImages = true),
+        MainPageData(name = "Colors Tamil (கலர்ஸ் தமிழ்)", data = "posts?search=Colors+Tamil&per_page=20", horizontalImages = true),
+        MainPageData(name = "Kalaignar TV (கலைஞர் டிவி)", data = "posts?search=Kalaignar+TV&per_page=20", horizontalImages = true),
+        MainPageData(name = "Tamil Web Series (வலைத் தொடர்)", data = "posts?search=Web+Series&per_page=20", horizontalImages = true),
+        MainPageData(name = "TV Shows & Reality (நிகழ்ச்சிகள்)", data = "posts?search=Show&per_page=20", horizontalImages = true)
     )
 
     private val defaultHeaders = mapOf(
@@ -34,18 +34,50 @@ class TamilDhoolProvider : MainAPI() {
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val endpoint = "$mainUrl/wp-json/wp/v2/${request.data}&page=$page&_embed=1"
-        val posts = fetchPosts(endpoint)
 
-        val items = posts.mapNotNull { post ->
-            post.toSearchResponse()
+        val response = try {
+            app.get(endpoint, headers = defaultHeaders)
+        } catch (_: Exception) {
+            null
         }
 
-        return newHomePageResponse(request.name, items)
+        // If request failed or invalid page error from WordPress
+        if (response == null || response.code !in 200..299) {
+            return newHomePageResponse(
+                listOf(HomePageList(request.name, emptyList(), isHorizontalImages = true)),
+                hasNext = false
+            )
+        }
+
+        // Extract pagination headers provided by WordPress REST API
+        val totalPages = response.headers["X-WP-TotalPages"]?.toIntOrNull()
+            ?: response.headers["x-wp-totalpages"]?.toIntOrNull()
+
+        val posts = try {
+            parseJson<List<WpPost>>(response.text)
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        // Calculate hasNext using official WordPress REST API total pages count
+        val hasNext = when {
+            totalPages != null -> page < totalPages
+            posts.size >= 20 -> true
+            else -> false
+        }
+
+        val items = posts.mapNotNull { it.toSearchResponse() }
+
+        // Always return HomePageList with isHorizontalImages = true for landscape card rendering
+        return newHomePageResponse(
+            listOf(HomePageList(request.name, items, isHorizontalImages = true)),
+            hasNext = hasNext
+        )
     }
 
     override suspend fun search(query: String): List<SearchResponse> {
         val encoded = URLEncoder.encode(query, "UTF-8")
-        val endpoint = "$mainUrl/wp-json/wp/v2/posts?search=$encoded&_embed=1&per_page=20"
+        val endpoint = "$mainUrl/wp-json/wp/v2/posts?search=$encoded&_embed=1&per_page=30"
         val posts = fetchPosts(endpoint)
 
         return posts.mapNotNull { post ->
@@ -80,40 +112,56 @@ class TamilDhoolProvider : MainAPI() {
 
             val episodes = mutableListOf<Episode>()
 
-            // Try to fetch related episodes from the show's category
+            // Current episode representation
+            val currentEpisode = newEpisode(post.link ?: url) {
+                this.name = title
+                this.posterUrl = poster
+                this.data = post.link ?: url
+            }
+
+            // Fetch episodes from category, ordered by date descending so latest episode is ALWAYS first
             val categoryId = post.categories?.lastOrNull()
             if (categoryId != null) {
                 try {
-                    val catEndpoint = "$mainUrl/wp-json/wp/v2/posts?categories=$categoryId&per_page=50&_embed=1"
-                    val catPosts = fetchPosts(catEndpoint)
-                    if (catPosts.isNotEmpty()) {
-                        catPosts.forEachIndexed { index, p ->
-                            episodes.add(
-                                newEpisode(p.link ?: "$mainUrl/?p=${p.id}") {
-                                    this.name = p.cleanTitle
-                                    this.posterUrl = p.posterUrl
-                                    this.episode = catPosts.size - index
-                                }
-                            )
+                    val catEndpoint = "$mainUrl/wp-json/wp/v2/posts?categories=$categoryId&per_page=100&_embed=1&orderby=date&order=desc"
+                    val catResponse = app.get(catEndpoint, headers = defaultHeaders)
+                    if (catResponse.code in 200..299) {
+                        val catPosts = parseJson<List<WpPost>>(catResponse.text)
+                        if (catPosts.isNotEmpty()) {
+                            // Enforce descending sort by date so latest is guaranteed at index 0
+                            val sortedPosts = catPosts.sortedByDescending { it.date ?: "" }
+
+                            sortedPosts.forEachIndexed { index, p ->
+                                episodes.add(
+                                    newEpisode(p.link ?: "$mainUrl/?p=${p.id}") {
+                                        this.name = p.cleanTitle
+                                        this.posterUrl = p.posterUrl
+                                        this.data = p.link ?: "$mainUrl/?p=${p.id}"
+                                        this.episode = sortedPosts.size - index
+                                    }
+                                )
+                            }
                         }
                     }
                 } catch (_: Exception) {
-                    // Ignore category fetch error and use current post
+                    // Fall back to current episode on failure
                 }
             }
 
-            // Fallback: If no episodes from category, add this post as single episode
+            // Ensure current episode is present; if no category episodes found, add current episode
             if (episodes.isEmpty()) {
-                episodes.add(
-                    newEpisode(post.link ?: url) {
-                        this.name = title
-                        this.posterUrl = poster
-                    }
-                )
+                episodes.add(currentEpisode)
+            } else {
+                val currentUrl = post.link ?: url
+                val alreadyContains = episodes.any { it.data == currentUrl }
+                if (!alreadyContains) {
+                    episodes.add(0, currentEpisode)
+                }
             }
 
             return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes) {
                 this.posterUrl = poster
+                this.backgroundPosterUrl = poster
                 this.plot = plot
                 this.year = year
             }
@@ -134,10 +182,12 @@ class TamilDhoolProvider : MainAPI() {
                 newEpisode(url) {
                     this.name = title
                     this.posterUrl = poster
+                    this.data = url
                 }
             )
         ) {
             this.posterUrl = poster
+            this.backgroundPosterUrl = poster
             this.plot = plot
         }
     }
@@ -153,7 +203,6 @@ class TamilDhoolProvider : MainAPI() {
             val post = fetchSinglePost(data)
             post?.content?.rendered ?: ""
         } else {
-            // Check if slug can fetch the post JSON for cleaner content
             val slug = data.trimEnd('/').substringAfterLast('/')
             val wpContent = try {
                 val slugEndpoint = "$mainUrl/wp-json/wp/v2/posts?slug=$slug"
@@ -168,7 +217,6 @@ class TamilDhoolProvider : MainAPI() {
 
         if (htmlContent.isBlank()) return false
 
-        // Extract using TamilDhoolExtractor
         return TamilDhoolExtractor.resolveAndExtract(
             elementOrHtml = htmlContent,
             baseUrl = mainUrl,
