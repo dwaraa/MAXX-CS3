@@ -10,3 +10,4 @@
 *.apk
 *.cs3
 builds/
+*.tmp.ps1
