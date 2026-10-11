@@ -67,6 +67,86 @@ data class WpPost(
             return org.jsoup.Jsoup.parse(raw).text()
         }
 
+    val displayDate: String
+        get() {
+            val titleText = cleanTitle
+
+            // 1. Match dd-mm-yyyy or dd.mm.yyyy or dd/mm/yyyy
+            val dmyRegex = Regex("""\b(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})\b""")
+            val dmyMatch = dmyRegex.find(titleText)
+            if (dmyMatch != null) {
+                val d = dmyMatch.groupValues[1].padStart(2, '0')
+                val m = dmyMatch.groupValues[2].padStart(2, '0')
+                val y = dmyMatch.groupValues[3].let { if (it.length == 2) "20$it" else it }
+                return "$d-$m-$y"
+            }
+
+            // 2. Match text month e.g. 11th Oct 2026 or 11 October 2026
+            val wordDateRegex = Regex(
+                """\b(\d{1,2})(?:st|nd|rd|th)?\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{2,4})\b""",
+                RegexOption.IGNORE_CASE
+            )
+            val wordMatch = wordDateRegex.find(titleText)
+            if (wordMatch != null) {
+                return wordMatch.value
+            }
+
+            // 3. Fallback to post.date (ISO format: 2026-10-11T12:00:00)
+            val pDate = date ?: ""
+            if (pDate.length >= 10 && pDate[4] == '-' && pDate[7] == '-') {
+                val y = pDate.substring(0, 4)
+                val m = pDate.substring(5, 7)
+                val d = pDate.substring(8, 10)
+                return "$d-$m-$y"
+            }
+
+            return ""
+        }
+
+    val pureShowTitle: String
+        get() {
+            var text = cleanTitle
+
+            // 1. Remove dates
+            text = text.replace(Regex("""\b\d{1,2}[-./]\d{1,2}[-./]\d{2,4}\b"""), " ")
+            text = text.replace(
+                Regex(
+                    """\b\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{2,4}\b""",
+                    RegexOption.IGNORE_CASE
+                ),
+                " "
+            )
+            text = text.replace(Regex("""\b(?:Episode|Epi)\s*\d+\b""", RegexOption.IGNORE_CASE), " ")
+
+            // 2. Remove channel and serial/show keywords (case-insensitive)
+            val channelPatterns = listOf(
+                """(?:Sun|Vijay|Star\s*Vijay|Zee\s*Tamil|Colors\s*Tamil|Kalaignar|Jaya|Raj|Polimer)\s*TV\s*(?:Serial|Show|Reality\s*Show)?""",
+                """(?:Sun|Vijay|Zee|Colors|Kalaignar)\s*(?:Serial|Show)""",
+                """(?:TV\s*)?(?:Serial|Show|Reality\s*Show)""",
+                """(?:சன்|விஜய்|ஜீ|கலர்ஸ்|கலைஞர்)\s*(?:டிவி)?\s*(?:சீரியல்|நிகழ்ச்சி)?""",
+                """(?:Watch\s*Online|Full\s*Episode|Today\s*Episode|Promo|Online)"""
+            )
+            for (p in channelPatterns) {
+                text = text.replace(Regex("""(?i)\b$p\b"""), " ")
+            }
+
+            // 3. Clean up any trailing/leading symbols, hyphens, colons, brackets, extra whitespace
+            text = text.replace(Regex("""[\[\]\(\)]"""), " ")
+                .replace(Regex("""[\s\-_|–—:]+$"""), "")
+                .replace(Regex("""^[\s\-_|–—:]+"""), "")
+                .replace(Regex("""\s{2,}"""), " ")
+                .trim()
+
+            return if (text.isNotBlank()) text else cleanTitle
+        }
+
+    val homeCardTitle: String
+        get() {
+            val d = displayDate
+            val show = pureShowTitle
+            return if (d.isNotBlank()) "$show • $d" else show
+        }
+
     val posterUrl: String?
         get() {
             // Prioritize landscape sizes from media details if available

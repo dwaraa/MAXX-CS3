@@ -18,13 +18,17 @@ class TamilDhoolProvider : MainAPI() {
     // Configure all homescreen sections with horizontalImages = true for landscape card posters
     override val mainPage = mainPageOf(
         MainPageData(name = "Latest Episodes (சமீபத்தியவை)", data = "posts?per_page=20", horizontalImages = true),
-        MainPageData(name = "Sun TV Serials (சன் டிவி)", data = "posts?search=Sun+TV&per_page=20", horizontalImages = true),
-        MainPageData(name = "Vijay TV Serials (விஜய் டிவி)", data = "posts?search=Vijay+TV&per_page=20", horizontalImages = true),
-        MainPageData(name = "Zee Tamil Serials (ஜீ தமிழ்)", data = "posts?search=Zee+Tamil&per_page=20", horizontalImages = true),
-        MainPageData(name = "Colors Tamil (கலர்ஸ் தமிழ்)", data = "posts?search=Colors+Tamil&per_page=20", horizontalImages = true),
-        MainPageData(name = "Kalaignar TV (கலைஞர் டிவி)", data = "posts?search=Kalaignar+TV&per_page=20", horizontalImages = true),
-        MainPageData(name = "Tamil Web Series (வலைத் தொடர்)", data = "posts?search=Web+Series&per_page=20", horizontalImages = true),
-        MainPageData(name = "TV Shows & Reality (நிகழ்ச்சிகள்)", data = "posts?search=Show&per_page=20", horizontalImages = true)
+        MainPageData(name = "Sun TV Serials (சன் டிவி சீரியல்)", data = "posts?search=Sun+TV+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Sun TV Shows (சன் டிவி நிகழ்ச்சிகள்)", data = "posts?search=Sun+TV+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Vijay TV Serials (விஜய் டிவி சீரியல்)", data = "posts?search=Vijay+TV+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Vijay TV Shows (விஜய் டிவி நிகழ்ச்சிகள்)", data = "posts?search=Vijay+TV+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Zee Tamil Serials (ஜீ தமிழ் சீரியல்)", data = "posts?search=Zee+Tamil+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Zee Tamil Shows (ஜீ தமிழ் நிகழ்ச்சிகள்)", data = "posts?search=Zee+Tamil+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Colors Tamil Serials (கலர்ஸ் தமிழ் சீரியல்)", data = "posts?search=Colors+Tamil+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Colors Tamil Shows (கலர்ஸ் தமிழ் நிகழ்ச்சிகள்)", data = "posts?search=Colors+Tamil+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Kalaignar TV Serials (கலைஞர் டிவி சீரியல்)", data = "posts?search=Kalaignar+TV+Serial&per_page=20", horizontalImages = true),
+        MainPageData(name = "Kalaignar TV Shows (கலைஞர் டிவி நிகழ்ச்சிகள்)", data = "posts?search=Kalaignar+TV+Show&per_page=20", horizontalImages = true),
+        MainPageData(name = "Tamil Web Series (வலைத் தொடர்)", data = "posts?search=Web+Series&per_page=20", horizontalImages = true)
     )
 
     private val defaultHeaders = mapOf(
@@ -105,16 +109,16 @@ class TamilDhoolProvider : MainAPI() {
 
         // 3. If post successfully retrieved from WordPress REST API
         if (post != null) {
-            val title = post.cleanTitle
+            val title = post.pureShowTitle
             val poster = post.posterUrl
             val plot = post.excerpt?.rendered?.let { Jsoup.parse(it).text() }
             val year = post.date?.take(4)?.toIntOrNull()
 
             val episodes = mutableListOf<Episode>()
 
-            // Current episode representation
+            // Current episode representation showing only the episode date
             val currentEpisode = newEpisode(post.link ?: url) {
-                this.name = title
+                this.name = post.displayDate.ifBlank { "Latest Episode" }
                 this.posterUrl = poster
                 this.data = post.link ?: url
             }
@@ -132,9 +136,10 @@ class TamilDhoolProvider : MainAPI() {
                             val sortedPosts = catPosts.sortedByDescending { it.date ?: "" }
 
                             sortedPosts.forEachIndexed { index, p ->
+                                val epDate = p.displayDate
                                 episodes.add(
                                     newEpisode(p.link ?: "$mainUrl/?p=${p.id}") {
-                                        this.name = p.cleanTitle
+                                        this.name = epDate.ifBlank { "Episode ${sortedPosts.size - index}" }
                                         this.posterUrl = p.posterUrl
                                         this.data = p.link ?: "$mainUrl/?p=${p.id}"
                                         this.episode = sortedPosts.size - index
@@ -169,7 +174,9 @@ class TamilDhoolProvider : MainAPI() {
 
         // 4. Fallback to scraping webpage directly if REST API call didn't yield post
         val doc = app.get(url, headers = defaultHeaders).document
-        val title = doc.selectFirst("h1.entry-title, h1")?.text() ?: "TamilDhool Video"
+        val rawTitle = doc.selectFirst("h1.entry-title, h1")?.text() ?: "TamilDhool Video"
+        val fallbackDate = extractDateFromText(rawTitle)
+        val title = cleanShowTitleFromText(rawTitle)
         val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
             ?: doc.selectFirst(".entry-content img")?.attr("abs:src")
         val plot = doc.selectFirst("meta[property=og:description]")?.attr("content")
@@ -180,7 +187,7 @@ class TamilDhoolProvider : MainAPI() {
             TvType.TvSeries,
             listOf(
                 newEpisode(url) {
-                    this.name = title
+                    this.name = fallbackDate.ifBlank { "Episode 1" }
                     this.posterUrl = poster
                     this.data = url
                 }
@@ -245,10 +252,42 @@ class TamilDhoolProvider : MainAPI() {
 
     private fun WpPost.toSearchResponse(): SearchResponse? {
         val linkUrl = link ?: return null
-        val titleText = cleanTitle.ifBlank { return null }
+        val titleText = homeCardTitle.ifBlank { return null }
 
         return newTvSeriesSearchResponse(titleText, linkUrl, TvType.TvSeries) {
             this.posterUrl = this@toSearchResponse.posterUrl
         }
+    }
+
+    private fun extractDateFromText(text: String): String {
+        val dmyRegex = Regex("""\b(\d{1,2})[-./](\d{1,2})[-./](\d{2,4})\b""")
+        val dmyMatch = dmyRegex.find(text)
+        if (dmyMatch != null) {
+            val d = dmyMatch.groupValues[1].padStart(2, '0')
+            val m = dmyMatch.groupValues[2].padStart(2, '0')
+            val y = dmyMatch.groupValues[3].let { if (it.length == 2) "20$it" else it }
+            return "$d-$m-$y"
+        }
+        return ""
+    }
+
+    private fun cleanShowTitleFromText(raw: String): String {
+        var text = raw.replace(Regex("""\b\d{1,2}[-./]\d{1,2}[-./]\d{2,4}\b"""), " ")
+        val channelPatterns = listOf(
+            """(?:Sun|Vijay|Star\s*Vijay|Zee\s*Tamil|Colors\s*Tamil|Kalaignar|Jaya|Raj|Polimer)\s*TV\s*(?:Serial|Show|Reality\s*Show)?""",
+            """(?:Sun|Vijay|Zee|Colors|Kalaignar)\s*(?:Serial|Show)""",
+            """(?:TV\s*)?(?:Serial|Show|Reality\s*Show)""",
+            """(?:சன்|விஜய்|ஜீ|கலர்ஸ்|கலைஞர்)\s*(?:டிவி)?\s*(?:சீரியல்|நிகழ்ச்சி)?""",
+            """(?:Watch\s*Online|Full\s*Episode|Today\s*Episode|Promo|Online)"""
+        )
+        for (p in channelPatterns) {
+            text = text.replace(Regex("""(?i)\b$p\b"""), " ")
+        }
+        return text.replace(Regex("""[\[\]\(\)]"""), " ")
+            .replace(Regex("""[\s\-_|–—:]+$"""), "")
+            .replace(Regex("""^[\s\-_|–—:]+"""), "")
+            .replace(Regex("""\s{2,}"""), " ")
+            .trim()
+            .ifBlank { raw }
     }
 }

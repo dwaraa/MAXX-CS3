@@ -46,3 +46,10 @@ jobs:
           FOLDER: dist
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MESSAGE: "Auto-build plugins for Cloudstream: ${GITHUB_SHA}"
+
+      - name: Purge jsDelivr CDN Cache
+        run: |
+          sleep 5
+          curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/plugins.json" || true
+          curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/TamilDhool.cs3" || true
+          curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/repo.json" || true
