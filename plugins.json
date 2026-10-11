@@ -1,10 +1,10 @@
 [
     {
-        "iconUrl": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/main/TamilDhool/icon.png",
-        "fileHash": "sha256-9358b1137402bc715e34c99077d73c86b43da8f2d590006eca205671913c99b8",
+        "iconUrl": "https://uptime.com/media/website_profiles/tamildhool.com.png",
+        "fileHash": "sha256-d888ce154367d1dc1471903078a7c53623934e00f44b9126a1da36de1f2eb3bc",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/TAMILDHOOL-CS3",
-        "fileSize": 44983,
+        "fileSize": 45715,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -15,7 +15,7 @@
             "TvSeries",
             "Movie"
         ],
-        "version": 5,
+        "version": 6,
         "internalName": "TamilDhool",
         "description": "Watch latest Tamil TV serials and shows (Sun TV, Vijay TV, Zee Tamil, Colors Tamil, etc.) powered by WordPress REST API",
         "url": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/TamilDhool.cs3",
