@@ -109,51 +109,104 @@ class TamilDhoolProvider : MainAPI() {
 
         // 3. If post successfully retrieved from WordPress REST API
         if (post != null) {
-            val title = post.pureShowTitle
+            val title = if (post.isStandalone) post.cleanTitle else post.pureShowTitle
             val poster = post.posterUrl
             val plot = post.excerpt?.rendered?.let { Jsoup.parse(it).text() }
             val year = post.date?.take(4)?.toIntOrNull()
 
-            val episodes = mutableListOf<Episode>()
+            // 1. If it is an individual standalone item (Promo, Trailer, Movie, Special Event)
+            // do NOT fetch unrelated category posts. Return as a single playable video.
+            if (post.isStandalone) {
+                val singleEpisode = newEpisode(post.link ?: url) {
+                    this.name = post.cleanTitle
+                    this.posterUrl = poster
+                    this.data = post.link ?: url
+                }
+                return newTvSeriesLoadResponse(title, url, TvType.Movie, listOf(singleEpisode)) {
+                    this.posterUrl = poster
+                    this.backgroundPosterUrl = poster
+                    this.plot = plot
+                    this.year = year
+                }
+            }
 
-            // Current episode representation showing only the episode date
+            // 2. For serials and recurring shows, fetch episodes specifically for THIS show
+            val episodes = mutableListOf<Episode>()
+            val showName = post.pureShowTitle
+
             val currentEpisode = newEpisode(post.link ?: url) {
                 this.name = post.displayDate.ifBlank { "Latest Episode" }
                 this.posterUrl = poster
                 this.data = post.link ?: url
             }
 
-            // Fetch episodes from category, ordered by date descending so latest episode is ALWAYS first
-            val categoryId = post.categories?.lastOrNull()
-            if (categoryId != null) {
-                try {
-                    val catEndpoint = "$mainUrl/wp-json/wp/v2/posts?categories=$categoryId&per_page=100&_embed=1&orderby=date&order=desc"
-                    val catResponse = app.get(catEndpoint, headers = defaultHeaders)
-                    if (catResponse.code in 200..299) {
-                        val catPosts = parseJson<List<WpPost>>(catResponse.text)
-                        if (catPosts.isNotEmpty()) {
-                            // Enforce descending sort by date so latest is guaranteed at index 0
-                            val sortedPosts = catPosts.sortedByDescending { it.date ?: "" }
+            try {
+                // Search specifically for this exact show name to avoid unrelated category mix-ups
+                val encodedShow = URLEncoder.encode(showName, "UTF-8")
+                val searchEndpoint = "$mainUrl/wp-json/wp/v2/posts?search=$encodedShow&per_page=100&_embed=1&orderby=date&order=desc"
+                val searchResponse = app.get(searchEndpoint, headers = defaultHeaders)
+                if (searchResponse.code in 200..299) {
+                    val foundPosts = parseJson<List<WpPost>>(searchResponse.text)
 
-                            sortedPosts.forEachIndexed { index, p ->
+                    // Strict filter: must match the show name and NOT be a promo
+                    val matchingPosts = foundPosts.filter { p ->
+                        !p.isStandalone && (
+                            p.pureShowTitle.equals(showName, ignoreCase = true) ||
+                            p.cleanTitle.contains(showName, ignoreCase = true)
+                        )
+                    }.sortedByDescending { it.date ?: "" }
+
+                    if (matchingPosts.isNotEmpty()) {
+                        matchingPosts.forEachIndexed { index, p ->
+                            val epDate = p.displayDate
+                            episodes.add(
+                                newEpisode(p.link ?: "$mainUrl/?p=${p.id}") {
+                                    this.name = epDate.ifBlank { "Episode ${matchingPosts.size - index}" }
+                                    this.posterUrl = p.posterUrl
+                                    this.data = p.link ?: "$mainUrl/?p=${p.id}"
+                                    this.episode = matchingPosts.size - index
+                                }
+                            )
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // Ignore search error and fallback
+            }
+
+            // Fallback: If show search yielded no episodes, query category but strictly filter by show name
+            if (episodes.isEmpty()) {
+                val categoryId = post.categories?.lastOrNull()
+                if (categoryId != null) {
+                    try {
+                        val catEndpoint = "$mainUrl/wp-json/wp/v2/posts?categories=$categoryId&per_page=100&_embed=1&orderby=date&order=desc"
+                        val catResponse = app.get(catEndpoint, headers = defaultHeaders)
+                        if (catResponse.code in 200..299) {
+                            val catPosts = parseJson<List<WpPost>>(catResponse.text)
+                            val matchingPosts = catPosts.filter { p ->
+                                !p.isStandalone && (
+                                    p.pureShowTitle.equals(showName, ignoreCase = true) ||
+                                    p.cleanTitle.contains(showName, ignoreCase = true)
+                                )
+                            }.sortedByDescending { it.date ?: "" }
+
+                            matchingPosts.forEachIndexed { index, p ->
                                 val epDate = p.displayDate
                                 episodes.add(
                                     newEpisode(p.link ?: "$mainUrl/?p=${p.id}") {
-                                        this.name = epDate.ifBlank { "Episode ${sortedPosts.size - index}" }
+                                        this.name = epDate.ifBlank { "Episode ${matchingPosts.size - index}" }
                                         this.posterUrl = p.posterUrl
                                         this.data = p.link ?: "$mainUrl/?p=${p.id}"
-                                        this.episode = sortedPosts.size - index
+                                        this.episode = matchingPosts.size - index
                                     }
                                 )
                             }
                         }
-                    }
-                } catch (_: Exception) {
-                    // Fall back to current episode on failure
+                    } catch (_: Exception) {}
                 }
             }
 
-            // Ensure current episode is present; if no category episodes found, add current episode
+            // Guarantee current episode is in list
             if (episodes.isEmpty()) {
                 episodes.add(currentEpisode)
             } else {
@@ -176,7 +229,8 @@ class TamilDhoolProvider : MainAPI() {
         val doc = app.get(url, headers = defaultHeaders).document
         val rawTitle = doc.selectFirst("h1.entry-title, h1")?.text() ?: "TamilDhool Video"
         val fallbackDate = extractDateFromText(rawTitle)
-        val title = cleanShowTitleFromText(rawTitle)
+        val isPromo = rawTitle.contains("promo", ignoreCase = true) || rawTitle.contains("trailer", ignoreCase = true)
+        val title = if (isPromo) rawTitle else cleanShowTitleFromText(rawTitle)
         val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
             ?: doc.selectFirst(".entry-content img")?.attr("abs:src")
         val plot = doc.selectFirst("meta[property=og:description]")?.attr("content")
@@ -184,10 +238,10 @@ class TamilDhoolProvider : MainAPI() {
         return newTvSeriesLoadResponse(
             title,
             url,
-            TvType.TvSeries,
+            if (isPromo) TvType.Movie else TvType.TvSeries,
             listOf(
                 newEpisode(url) {
-                    this.name = fallbackDate.ifBlank { "Episode 1" }
+                    this.name = if (isPromo) rawTitle else fallbackDate.ifBlank { "Episode 1" }
                     this.posterUrl = poster
                     this.data = url
                 }
@@ -254,8 +308,14 @@ class TamilDhoolProvider : MainAPI() {
         val linkUrl = link ?: return null
         val titleText = homeCardTitle.ifBlank { return null }
 
-        return newTvSeriesSearchResponse(titleText, linkUrl, TvType.TvSeries) {
-            this.posterUrl = this@toSearchResponse.posterUrl
+        return if (isStandalone) {
+            newMovieSearchResponse(titleText, linkUrl, TvType.Movie) {
+                this.posterUrl = this@toSearchResponse.posterUrl
+            }
+        } else {
+            newTvSeriesSearchResponse(titleText, linkUrl, TvType.TvSeries) {
+                this.posterUrl = this@toSearchResponse.posterUrl
+            }
         }
     }
 

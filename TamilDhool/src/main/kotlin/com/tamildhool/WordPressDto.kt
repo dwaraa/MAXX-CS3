@@ -140,12 +140,24 @@ data class WpPost(
             return if (text.isNotBlank()) text else cleanTitle
         }
 
-    val homeCardTitle: String
+    val isStandalone: Boolean
         get() {
-            val d = displayDate
-            val show = pureShowTitle
-            return if (d.isNotBlank()) "$show • $d" else show
+            val titleLower = cleanTitle.lowercase()
+            return titleLower.contains("promo") ||
+                    titleLower.contains("trailer") ||
+                    titleLower.contains("teaser") ||
+                    titleLower.contains("movie") ||
+                    titleLower.contains("audio launch") ||
+                    titleLower.contains("interview") ||
+                    titleLower.contains("special") ||
+                    titleLower.contains("event") ||
+                    titleLower.contains("press meet") ||
+                    titleLower.contains("ப்ரோமோ") ||
+                    titleLower.contains("டிரெய்லர்")
         }
+
+    val homeCardTitle: String
+        get() = if (isStandalone) cleanTitle else pureShowTitle
 
     val posterUrl: String?
         get() {
