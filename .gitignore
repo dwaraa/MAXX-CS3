@@ -11,3 +11,6 @@ build/
 *.cs3
 builds/
 *.tmp.ps1
+*.ps1
+MAIN-RESLOVER/
+embed-*.html
