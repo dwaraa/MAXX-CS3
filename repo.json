@@ -1,5 +1,6 @@
 {
   "name": "TamilDhool Provider",
+  "iconUrl": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/main/TamilDhool/icon.png",
   "description": "Cloudstream 3 Provider for TamilDhool (Sun TV, Vijay TV, Zee Tamil, Colors Tamil Serials and Shows) powered by WordPress REST API",
   "manifestVersion": 1,
   "pluginLists": [
