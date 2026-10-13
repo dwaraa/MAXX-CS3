@@ -22,10 +22,10 @@
     },
     {
         "iconUrl": "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.png",
-        "fileHash": "sha256-4732afc7df9c213f30d61f71917f83e35e4999582ab2680acce78bbcf52f1bcf",
+        "fileHash": "sha256-8b5201e6664835472cfa1f93f1713aa5d69e7897051daab406e6832a8eb7c13b",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
-        "fileSize": 55947,
+        "fileSize": 78708,
         "status": 1,
         "language": "en",
         "authors": [
