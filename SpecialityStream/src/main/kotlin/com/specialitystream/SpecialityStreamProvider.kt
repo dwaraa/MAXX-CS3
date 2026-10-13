@@ -346,7 +346,7 @@ class SpecialityStreamProvider : MainAPI() {
                 subtitleCallback = subtitleCallback
             )
             if (vidlinkSuccess) foundLinks = true
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
         }
 
         // 2. Multi-Embed Providers (VidSrc, 2Embed, AutoEmbed, MultiEmbed, SmashyStream, MoviesAPI)
@@ -362,7 +362,7 @@ class SpecialityStreamProvider : MainAPI() {
                 },
                 subtitleCallback = subtitleCallback
             )
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
         }
 
         return foundLinks

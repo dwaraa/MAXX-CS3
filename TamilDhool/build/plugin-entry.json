@@ -2,7 +2,7 @@
     "iconUrl": "https://uptime.com/media/website_profiles/tamildhool.com.png",
     "fileHash": "sha256-793289f463a3821674efb244d18a84d6cf4fc874fef5efceaa3618d18563c5ee",
     "apiVersion": 1,
-    "repositoryUrl": "https://github.com/dwaraa/TAMILDHOOL-CS3",
+    "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
     "fileSize": 47298,
     "status": 1,
     "language": "ta",
@@ -17,6 +17,6 @@
     "version": 10,
     "internalName": "TamilDhool",
     "description": "Watch latest Tamil TV serials and shows (Sun TV, Vijay TV, Zee Tamil, Colors Tamil, etc.) powered by WordPress REST API",
-    "url": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/TamilDhool.cs3",
+    "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/TamilDhool.cs3",
     "name": "TamilDhool"
 }
