@@ -59,7 +59,14 @@ data class TmdbMovieDetail(
             ?: images?.backdrops?.firstOrNull()?.filePath?.let { "https://image.tmdb.org/t/p/original$it" }
     }
 
-    fun getPosterUrl(): String? {
+    fun getPosterUrl(preferredLang: String? = null): String? {
+        val posterList = images?.posters
+        if (!posterList.isNullOrEmpty() && !preferredLang.isNullOrBlank()) {
+            val matched = posterList.firstOrNull { it.iso6391.equals(preferredLang, ignoreCase = true) }
+            if (matched?.filePath != null) {
+                return "https://image.tmdb.org/t/p/w500${matched.filePath}"
+            }
+        }
         return posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
             ?: images?.posters?.firstOrNull()?.filePath?.let { "https://image.tmdb.org/t/p/w500$it" }
     }

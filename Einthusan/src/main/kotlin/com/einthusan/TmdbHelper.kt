@@ -28,6 +28,42 @@ object TmdbHelper {
             .ifBlank { raw.trim() }
     }
 
+    fun toIso6391(language: String?): String {
+        return when (language?.lowercase()?.trim()) {
+            "tamil" -> "ta"
+            "telugu" -> "te"
+            "hindi" -> "hi"
+            "malayalam" -> "ml"
+            "kannada" -> "kn"
+            "bengali" -> "bn"
+            "marathi" -> "mr"
+            "punjabi" -> "pa"
+            else -> "en"
+        }
+    }
+
+    var posterWorkerUrl: String = "https://posters.devs-10f.workers.dev"
+
+    fun getPosterWithLanguage(posterUrl: String?, language: String?): String? {
+        val langName = language?.trim()?.replaceFirstChar { it.uppercase() }?.takeIf { it.isNotBlank() } ?: "Tamil"
+        if (posterUrl.isNullOrBlank()) {
+            val encodedLang = URLEncoder.encode(langName, "UTF-8")
+            return "$posterWorkerUrl/?text=$encodedLang&w=500&h=750&bg=0f172a&color=fbbf24&size=36&format=webp"
+        }
+        val cleanUrl = if (posterUrl.startsWith("http")) {
+            posterUrl
+        } else {
+            "https://image.tmdb.org/t/p/w500/${posterUrl.removePrefix("/")}"
+        }
+        return try {
+            val encodedTmdb = URLEncoder.encode(cleanUrl, "UTF-8")
+            val encodedLang = URLEncoder.encode(langName, "UTF-8")
+            "$posterWorkerUrl/?tmdb=$encodedTmdb&lang=$encodedLang&format=webp"
+        } catch (_: Exception) {
+            cleanUrl
+        }
+    }
+
     suspend fun getMovieMetadata(
         title: String,
         year: Int? = null,

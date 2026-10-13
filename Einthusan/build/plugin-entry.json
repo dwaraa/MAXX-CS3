@@ -1,0 +1,21 @@
+{
+    "iconUrl": "https://einthusan.tv/etc/favicon-32x32.png",
+    "fileHash": "sha256-d7c314a3e2e737b892a29cf87de97226933a072a33d3cbbff64d8d8eb93727e6",
+    "apiVersion": 1,
+    "repositoryUrl": "https://github.com/dwaraa/TAMILDHOOL-CS3",
+    "fileSize": 45565,
+    "status": 1,
+    "language": "ta",
+    "authors": [
+        "dwaraa",
+        "Cloudstream Community"
+    ],
+    "tvTypes": [
+        "Movie"
+    ],
+    "version": 1,
+    "internalName": "Einthusan",
+    "description": "Watch South Asian movies with 4K UHD and HD streaming, mapped with TMDB transparent logos, backdrops, trailers, and rich metadata",
+    "url": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/Einthusan.cs3",
+    "name": "Einthusan"
+}

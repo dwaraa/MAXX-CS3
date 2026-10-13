@@ -69,6 +69,22 @@ class EinthusanProvider : MainAPI() {
             }
         }
 
+        fun extractLanguage(url: String, textContext: String? = null, fallback: String = "Tamil"): String {
+            val urlLang = Regex("""[?&]lang=([a-zA-Z]+)""").find(url)?.groupValues?.get(1)?.trim()
+            if (!urlLang.isNullOrBlank()) {
+                return urlLang.lowercase().replaceFirstChar { it.uppercase() }
+            }
+            if (!textContext.isNullOrBlank()) {
+                val supported = listOf("Tamil", "Telugu", "Hindi", "Malayalam", "Kannada", "Bengali", "Marathi", "Punjabi")
+                for (l in supported) {
+                    if (Regex("""\b$l\b""", RegexOption.IGNORE_CASE).containsMatchIn(textContext)) {
+                        return l
+                    }
+                }
+            }
+            return fallback.lowercase().replaceFirstChar { it.uppercase() }
+        }
+
         suspend fun extractEinthusanLinks(
             moviePageUrl: String,
             callback: (ExtractorLink) -> Unit
@@ -76,53 +92,33 @@ class EinthusanProvider : MainAPI() {
             val fixedUrl = fixUrl(moviePageUrl)
             val movieIdMatch = Regex("""/movie/watch/([^/?]+)""").find(fixedUrl)
             val movieId = movieIdMatch?.groupValues?.get(1) ?: return false
-            val langMatch = Regex("""[?&]lang=([^&]+)""").find(fixedUrl)
-            val lang = langMatch?.groupValues?.get(1) ?: "tamil"
 
-            var uhdFound = false
             var standardFound = false
+            var uhdFound = false
 
-            // 1. Direct UHD (4K) Link Detection on CDNs (Static unsigned MP4 with 'B' prefix)
-            for (cdn in listOf("cdn2", "cdn1")) {
-                val uhdUrl = "https://$cdn.einthusan.io/etv/content/B$movieId.mp4"
-                try {
-                    val head = app.head(uhdUrl, headers = DEFAULT_HEADERS, timeout = 10)
-                    if (head.code in 200..299) {
-                        callback(
-                            newExtractorLink(
-                                source = "Einthusan 4K UHD",
-                                name = "Einthusan - 4K UHD (Direct MP4)",
-                                url = uhdUrl,
-                                type = ExtractorLinkType.VIDEO
-                            ) {
-                                this.referer = "https://einthusan.tv/"
-                                this.quality = Qualities.P2160.value
-                            }
-                        )
-                        uhdFound = true
-                        break
-                    }
-                } catch (_: Exception) {}
-            }
-
-            // 2. Extract Page Parameters (data-pageid & data-ejpingables) and POST to AJAX endpoint
+            // 1. Fetch movie watch page to acquire CSRF tokens, pingables and session cookies
             try {
-                val pageResp = app.get(fixedUrl, headers = DEFAULT_HEADERS)
+                val pageResp = app.get(fixedUrl, headers = DEFAULT_HEADERS, timeout = 30)
                 val pageDoc = pageResp.document
+                val cookies = pageResp.cookies
+                val cookieHeader = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
 
-                val pageId = pageDoc.selectFirst("html")?.attr("data-pageid")?.ifBlank { null }
-                    ?: Regex("""data-pageid="([^"]+)"""").find(pageResp.text)?.groupValues?.get(1)?.let {
-                        org.jsoup.parser.Parser.unescapeEntities(it, true)
-                    }
+                var lang = Regex("""[?&]lang=([a-zA-Z]+)""").find(fixedUrl)?.groupValues?.get(1)?.lowercase()
+                if (lang.isNullOrBlank()) {
+                    lang = extractLanguage(fixedUrl, pageDoc.text()).lowercase()
+                }
 
-                val ejpingables = pageDoc.selectFirst("section#UIVideoPlayer")?.attr("data-ejpingables")?.ifBlank { null }
-                    ?: Regex("""data-ejpingables="([^"]+)"""").find(pageResp.text)?.groupValues?.get(1)?.let {
-                        org.jsoup.parser.Parser.unescapeEntities(it, true)
-                    }
+                val rawPageId = pageDoc.selectFirst("html")?.attr("data-pageid")?.ifBlank { null }
+                    ?: Regex("""data-pageid="([^"]+)"""").find(pageResp.text)?.groupValues?.get(1)
+                val pageId = rawPageId?.let { org.jsoup.parser.Parser.unescapeEntities(it, true) }
+
+                val rawEjpingables = pageDoc.selectFirst("section#UIVideoPlayer")?.attr("data-ejpingables")?.ifBlank { null }
+                    ?: Regex("""data-ejpingables="([^"]+)"""").find(pageResp.text)?.groupValues?.get(1)
+                val ejpingables = rawEjpingables?.let { org.jsoup.parser.Parser.unescapeEntities(it, true) }
 
                 if (!pageId.isNullOrBlank() && !ejpingables.isNullOrBlank()) {
                     val ajaxUrl = "https://einthusan.tv/ajax/movie/watch/$movieId/?lang=$lang"
-                    val ajaxHeaders = mapOf(
+                    val ajaxHeaders = mutableMapOf(
                         "User-Agent" to USER_AGENT,
                         "Accept" to "application/json, text/javascript, */*; q=0.01",
                         "Accept-Language" to "en-US,en;q=0.9",
@@ -131,13 +127,24 @@ class EinthusanProvider : MainAPI() {
                         "Referer" to fixedUrl,
                         "Origin" to "https://einthusan.tv"
                     )
+                    if (cookieHeader.isNotBlank()) {
+                        ajaxHeaders["Cookie"] = cookieHeader
+                    }
+
                     val payload = mapOf(
                         "xEvent" to "UIVideoPlayer.PingOutcome",
                         "xJson" to """{"EJOutcomes":"$ejpingables","NativeHLS":false}""",
                         "gorilla.csrf.Token" to pageId
                     )
 
-                    val ajaxResp = app.post(ajaxUrl, headers = ajaxHeaders, data = payload, timeout = 30)
+                    val ajaxResp = app.post(
+                        ajaxUrl,
+                        headers = ajaxHeaders,
+                        data = payload,
+                        cookies = cookies,
+                        timeout = 30
+                    )
+
                     if (ajaxResp.code in 200..299) {
                         val jsonTree = parseJson<Map<String, Any>>(ajaxResp.text)
                         val dataObj = jsonTree["Data"] as? Map<*, *>
@@ -188,6 +195,29 @@ class EinthusanProvider : MainAPI() {
                 }
             } catch (_: Exception) {}
 
+            // 2. Direct UHD (4K) Link Detection on CDNs
+            for (cdn in listOf("cdn2", "cdn1")) {
+                val uhdUrl = "https://$cdn.einthusan.io/etv/content/B$movieId.mp4"
+                try {
+                    val head = app.head(uhdUrl, headers = DEFAULT_HEADERS, timeout = 4)
+                    if (head.code in 200..299) {
+                        callback(
+                            newExtractorLink(
+                                source = "Einthusan 4K UHD",
+                                name = "Einthusan - 4K UHD (Direct MP4)",
+                                url = uhdUrl,
+                                type = ExtractorLinkType.VIDEO
+                            ) {
+                                this.referer = "https://einthusan.tv/"
+                                this.quality = Qualities.P2160.value
+                            }
+                        )
+                        uhdFound = true
+                        break
+                    }
+                } catch (_: Exception) {}
+            }
+
             // 3. Fallback CDN link for numeric IDs if AJAX did not return links
             if (!standardFound && !uhdFound && movieId.all { it.isDigit() }) {
                 val fallbackUrl = "https://cdn2.einthusan.io/etv/content/D$movieId.mp4"
@@ -227,7 +257,8 @@ class EinthusanProvider : MainAPI() {
         }
 
         val doc = response.document
-        val movies = parseMovieList(doc)
+        val langFromReq = Regex("""lang=([a-zA-Z]+)""").find(request.data)?.groupValues?.get(1)
+        val movies = parseMovieList(doc, defaultLanguage = langFromReq)
 
         val hasNext = movies.isNotEmpty() && (
             doc.selectFirst("a.next, .pagination a, div.numerical-nav a") != null ||
@@ -242,15 +273,20 @@ class EinthusanProvider : MainAPI() {
 
     override suspend fun search(query: String): List<SearchResponse> {
         val encoded = URLEncoder.encode(query, "UTF-8")
-        val searchUrl = "$mainUrl/movie/results/?query=$encoded"
+        val languages = listOf("tamil", "telugu", "hindi", "malayalam", "kannada", "bengali", "marathi", "punjabi")
 
-        val doc = try {
-            app.get(searchUrl, headers = DEFAULT_HEADERS).document
-        } catch (_: Exception) {
-            return emptyList()
-        }
+        val results = languages.amap { lang ->
+            val searchUrl = "$mainUrl/movie/results/?query=$encoded&lang=$lang"
+            val doc = try {
+                app.get(searchUrl, headers = DEFAULT_HEADERS).document
+            } catch (_: Exception) {
+                null
+            } ?: return@amap emptyList()
 
-        return parseMovieList(doc)
+            parseMovieList(doc, defaultLanguage = lang)
+        }.flatten()
+
+        return results.distinctBy { it.url }
     }
 
     override suspend fun load(url: String): LoadResponse {
@@ -265,8 +301,10 @@ class EinthusanProvider : MainAPI() {
 
         val yearText = summary?.selectFirst(".info p")?.text()
         val scrapedYear = Regex("""\b(19\d{2}|20\d{2})\b""").find(yearText ?: "")?.value?.toIntOrNull()
-        val scrapedPoster = summary?.selectFirst(".block1 img, img")?.attr("src")?.let { fixUrl(it) }
         val scrapedPlot = summary?.selectFirst("p.synopsis")?.text()?.trim()
+
+        val displayLang = extractLanguage(fixedUrl, yearText ?: doc.text())
+        val isoLang = TmdbHelper.toIso6391(displayLang)
 
         val scrapedActors = summary?.select(".professionals .prof")?.mapNotNull { prof ->
             val actorName = prof.selectFirst("p")?.text()?.trim() ?: return@mapNotNull null
@@ -278,15 +316,22 @@ class EinthusanProvider : MainAPI() {
 
         // Fetch rich TMDB metadata: transparent logo, 4K/HD backdrop, posters, trailers, cast pictures & ratings
         val tmdb = try {
-            TmdbHelper.getMovieMetadata(rawTitle, scrapedYear, lang)
+            TmdbHelper.getMovieMetadata(rawTitle, scrapedYear, isoLang)
         } catch (_: Exception) {
             null
         }
 
-        val finalTitle = tmdb?.title ?: TmdbHelper.cleanMovieTitle(rawTitle)
-        val finalPoster = tmdb?.getPosterUrl() ?: scrapedPoster
-        val finalBackdrop = tmdb?.getBackdropUrl() ?: scrapedPoster
-        val finalLogo = tmdb?.getLogoUrl(lang)
+        val baseTitle = tmdb?.title ?: TmdbHelper.cleanMovieTitle(rawTitle)
+        val finalTitle = if (baseTitle.contains(displayLang, ignoreCase = true)) {
+            baseTitle
+        } else {
+            "$baseTitle ($displayLang)"
+        }
+
+        val tmdbPoster = tmdb?.getPosterUrl(isoLang)
+        val finalPoster = TmdbHelper.getPosterWithLanguage(tmdbPoster, displayLang)
+        val finalBackdrop = tmdb?.getBackdropUrl()
+        val finalLogo = tmdb?.getLogoUrl(isoLang)
         val finalPlot = tmdb?.overview?.ifBlank { null } ?: scrapedPlot
         val finalYear = tmdb?.getYear() ?: scrapedYear
         val finalTags = tmdb?.genres?.mapNotNull { it.name }?.ifEmpty { null } ?: scrapedTags
@@ -331,38 +376,60 @@ class EinthusanProvider : MainAPI() {
         return extractEinthusanLinks(data, callback)
     }
 
-    private fun parseMovieList(doc: org.jsoup.nodes.Document): List<SearchResponse> {
-        val items = mutableListOf<SearchResponse>()
+    private suspend fun parseMovieList(
+        doc: org.jsoup.nodes.Document,
+        defaultLanguage: String? = null
+    ): List<SearchResponse> {
         val movieElements = doc.select("section#UIMovieSummary li, div.tabview li").ifEmpty {
             doc.select("li:has(a[href*=/movie/watch/])")
         }
 
-        for (li in movieElements) {
-            val watchLinkTag = li.selectFirst("a[href*=/movie/watch/]") ?: continue
+        val items = movieElements.amap { li ->
+            val watchLinkTag = li.selectFirst("a[href*=/movie/watch/]") ?: return@amap null
             val rawHref = watchLinkTag.attr("href")
-            if (rawHref.isBlank()) continue
-            val movieUrl = fixUrl(rawHref)
+            if (rawHref.isBlank()) return@amap null
+
+            // Ensure URL preserves language so language variants are separate content items
+            val normalizedHref = if (defaultLanguage != null && (rawHref.endsWith("?lang=") || !rawHref.contains("lang="))) {
+                if (rawHref.endsWith("?lang=")) "${rawHref}$defaultLanguage" else "$rawHref?lang=$defaultLanguage"
+            } else {
+                rawHref
+            }
+            val movieUrl = fixUrl(normalizedHref)
 
             val titleTag = li.selectFirst("a.title h3")
                 ?: li.selectFirst("a.title")
                 ?: li.selectFirst("h3")
-            val title = titleTag?.text()?.trim() ?: continue
-            if (title.isBlank()) continue
-
-            val imgTag = li.selectFirst(".block1 img, img")
-            val posterUrl = imgTag?.attr("src")?.let { fixUrl(it) }
+            val title = titleTag?.text()?.trim() ?: return@amap null
+            if (title.isBlank()) return@amap null
 
             val cleanTitle = TmdbHelper.cleanMovieTitle(title)
             val infoText = li.selectFirst(".info p")?.text()
             val cardYear = Regex("""\b(19\d{2}|20\d{2})\b""").find(infoText ?: "")?.value?.toIntOrNull()
 
-            items.add(
-                newMovieSearchResponse(cleanTitle, movieUrl, TvType.Movie) {
-                    this.posterUrl = posterUrl
-                    this.year = cardYear
-                }
-            )
-        }
+            val cardLang = extractLanguage(movieUrl, infoText, defaultLanguage ?: "Tamil")
+            val isoLang = TmdbHelper.toIso6391(cardLang)
+
+            val displayTitle = if (cleanTitle.contains(cardLang, ignoreCase = true)) {
+                cleanTitle
+            } else {
+                "$cleanTitle ($cardLang)"
+            }
+
+            // Always resolve TMDB poster with language badge
+            val tmdb = try {
+                TmdbHelper.getMovieMetadata(cleanTitle, cardYear, isoLang)
+            } catch (_: Exception) {
+                null
+            }
+            val tmdbPoster = tmdb?.getPosterUrl(isoLang)
+            val finalPosterUrl = TmdbHelper.getPosterWithLanguage(tmdbPoster, cardLang)
+
+            newMovieSearchResponse(displayTitle, movieUrl, TvType.Movie) {
+                this.posterUrl = finalPosterUrl
+                this.year = cardYear
+            }
+        }.filterNotNull()
 
         return items.distinctBy { it.url }
     }
