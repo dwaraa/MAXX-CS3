@@ -8,6 +8,8 @@
 /captures
 MAIN-RESLOVER/
 builds/
+build/
+TamilUltra/build/
 poster-workers/
 .cxx
 *.apk
