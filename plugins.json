@@ -21,6 +21,29 @@
         "name": "Einthusan"
     },
     {
+        "iconUrl": "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.png",
+        "fileHash": "sha256-4732afc7df9c213f30d61f71917f83e35e4999582ab2680acce78bbcf52f1bcf",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/dwaraa/TAMILDHOOL-CS3",
+        "fileSize": 55947,
+        "status": 1,
+        "language": "en",
+        "authors": [
+            "dwaraa",
+            "Cloudstream Community"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Anime"
+        ],
+        "version": 1,
+        "internalName": "SpecialityStream",
+        "description": "Speciality stream powered by TMDB metadata with VidLink.pro, VidSrc, Embed.su, 2Embed, and multi-embed providers",
+        "url": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/SpecialityStream.cs3",
+        "name": "SpecialityStream"
+    },
+    {
         "iconUrl": "https://uptime.com/media/website_profiles/tamildhool.com.png",
         "fileHash": "sha256-793289f463a3821674efb244d18a84d6cf4fc874fef5efceaa3618d18563c5ee",
         "apiVersion": 1,
