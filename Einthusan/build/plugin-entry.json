@@ -1,9 +1,9 @@
 {
     "iconUrl": "https://einthusan.tv/etc/favicon-32x32.png",
-    "fileHash": "sha256-0cc35c9c551b9a7f86b28c536d1943e2ffc7f2cd3458792d5618f7a30d4e958c",
+    "fileHash": "sha256-04478032682879b3f3da0d02331f8acf1eed0dae27cb173a294a2c0173f0ffd9",
     "apiVersion": 1,
     "repositoryUrl": "https://github.com/dwaraa/TAMILDHOOL-CS3",
-    "fileSize": 49678,
+    "fileSize": 49652,
     "status": 1,
     "language": "ta",
     "authors": [
@@ -13,7 +13,7 @@
     "tvTypes": [
         "Movie"
     ],
-    "version": 4,
+    "version": 5,
     "internalName": "Einthusan",
     "description": "Watch South Asian movies with 4K UHD and HD streaming, mapped with TMDB transparent logos, backdrops, trailers, and rich metadata",
     "url": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/Einthusan.cs3",

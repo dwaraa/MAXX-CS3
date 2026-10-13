@@ -49,7 +49,7 @@ object TmdbHelper {
         val langName = language?.trim()?.replaceFirstChar { it.uppercase() }?.takeIf { it.isNotBlank() } ?: "Tamil"
         val targetWorkerUrl = if (posterUrl.isNullOrBlank()) {
             val encodedLang = URLEncoder.encode(langName, "UTF-8")
-            "$posterWorkerUrl/?text=$encodedLang&w=500&h=750&bg=0f172a&color=fbbf24&size=36&format=webp"
+            "$posterWorkerUrl/?text=$encodedLang&w=500&h=750&v=2"
         } else {
             val cleanUrl = if (posterUrl.startsWith("http")) {
                 posterUrl
@@ -58,7 +58,7 @@ object TmdbHelper {
             }
             val encodedTmdb = URLEncoder.encode(cleanUrl, "UTF-8")
             val encodedLang = URLEncoder.encode(langName, "UTF-8")
-            "$posterWorkerUrl/?tmdb=$encodedTmdb&lang=$encodedLang&format=webp"
+            "$posterWorkerUrl/?tmdb=$encodedTmdb&lang=$encodedLang&v=2"
         }
 
         return try {
