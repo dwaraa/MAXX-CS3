@@ -1,9 +1,9 @@
 {
-  "name": "TamilDhool Provider",
-  "iconUrl": "https://uptime.com/media/website_profiles/tamildhool.com.png",
-  "description": "Cloudstream 3 Provider for TamilDhool and Einthusan (Tamil TV serials, shows, and South Asian movies with 4K UHD and HD playback)",
+  "name": "MAXX Provider",
+  "iconUrl": "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.png",
+  "description": "Cloudstream 3 Provider repository featuring SpecialityStream (TMDB, VidLink, VidSrc), Einthusan (4K UHD & HD), TamilDhool, and TamilUltra",
   "manifestVersion": 1,
   "pluginLists": [
-    "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/plugins.json"
+    "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/plugins.json"
   ]
 }
