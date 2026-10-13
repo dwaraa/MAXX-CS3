@@ -46,21 +46,24 @@ object TmdbHelper {
 
     fun getPosterWithLanguage(posterUrl: String?, language: String?): String? {
         val langName = language?.trim()?.replaceFirstChar { it.uppercase() }?.takeIf { it.isNotBlank() } ?: "Tamil"
-        if (posterUrl.isNullOrBlank()) {
+        val targetWorkerUrl = if (posterUrl.isNullOrBlank()) {
             val encodedLang = URLEncoder.encode(langName, "UTF-8")
-            return "$posterWorkerUrl/?text=$encodedLang&w=500&h=750&bg=0f172a&color=fbbf24&size=36&format=webp"
-        }
-        val cleanUrl = if (posterUrl.startsWith("http")) {
-            posterUrl
+            "$posterWorkerUrl/?text=$encodedLang&w=500&h=750&bg=0f172a&color=fbbf24&size=36&format=webp"
         } else {
-            "https://image.tmdb.org/t/p/w500/${posterUrl.removePrefix("/")}"
-        }
-        return try {
+            val cleanUrl = if (posterUrl.startsWith("http")) {
+                posterUrl
+            } else {
+                "https://image.tmdb.org/t/p/w500/${posterUrl.removePrefix("/")}"
+            }
             val encodedTmdb = URLEncoder.encode(cleanUrl, "UTF-8")
             val encodedLang = URLEncoder.encode(langName, "UTF-8")
             "$posterWorkerUrl/?tmdb=$encodedTmdb&lang=$encodedLang&format=webp"
+        }
+
+        return try {
+            "https://wsrv.nl/?url=${URLEncoder.encode(targetWorkerUrl, "UTF-8")}&output=webp"
         } catch (_: Exception) {
-            cleanUrl
+            targetWorkerUrl
         }
     }
 

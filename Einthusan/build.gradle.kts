@@ -1,4 +1,4 @@
-version = 1
+version = 3
 
 cloudstream {
     description = "Watch South Asian movies with 4K UHD and HD streaming, mapped with TMDB transparent logos, backdrops, trailers, and rich metadata"

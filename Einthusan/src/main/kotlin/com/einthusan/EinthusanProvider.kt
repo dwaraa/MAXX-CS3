@@ -18,19 +18,58 @@ class EinthusanProvider : MainAPI() {
     override val hasQuickSearch = true
 
     override val mainPage = mainPageOf(
+        // Tamil
+        MainPageData(name = "Tamil - Featured & Browse", data = "movie/browse/?lang=tamil"),
         MainPageData(name = "Tamil - Recently Added", data = "movie/results/?find=Recent&lang=tamil"),
-        MainPageData(name = "Tamil - Popular (Past 30 Days)", data = "movie/results/?find=Popularity&lang=tamil&ptype=View&tp=l30d"),
-        MainPageData(name = "Tamil - Top Rated", data = "movie/results/?find=Popularity&lang=tamil&ptype=Rating"),
+        MainPageData(name = "Tamil - Popular (Past 30 Days)", data = "movie/results/?find=Popularity&lang=tamil&ptype=view&tp=l30d"),
+        MainPageData(name = "Tamil - Top Rated (All Time)", data = "movie/results/?find=Popularity&lang=tamil&ptype=rating&tp=alltime"),
+        MainPageData(name = "Tamil - Most Viewed (All Time)", data = "movie/results/?find=Popularity&lang=tamil&ptype=view&tp=alltime"),
         MainPageData(name = "Tamil - Staff Picks", data = "movie/results/?find=StaffPick&lang=tamil"),
         MainPageData(name = "Tamil - Regional Hits", data = "movie/results/?find=RegionalHit&lang=tamil"),
-        MainPageData(name = "Telugu - Popular", data = "movie/results/?find=Popularity&lang=telugu&ptype=View&tp=l30d"),
-        MainPageData(name = "Telugu - Recent", data = "movie/results/?find=Recent&lang=telugu"),
-        MainPageData(name = "Hindi - Popular", data = "movie/results/?find=Popularity&lang=hindi&ptype=View&tp=l30d"),
-        MainPageData(name = "Hindi - Recent", data = "movie/results/?find=Recent&lang=hindi"),
-        MainPageData(name = "Malayalam - Popular", data = "movie/results/?find=Popularity&lang=malayalam&ptype=View&tp=l30d"),
-        MainPageData(name = "Malayalam - Recent", data = "movie/results/?find=Recent&lang=malayalam"),
-        MainPageData(name = "Kannada - Popular", data = "movie/results/?find=Popularity&lang=kannada&ptype=View&tp=l30d"),
-        MainPageData(name = "Kannada - Recent", data = "movie/results/?find=Recent&lang=kannada")
+        MainPageData(name = "Tamil - Year 2025", data = "movie/results/?find=Year&lang=tamil&year=2025"),
+
+        // Telugu
+        MainPageData(name = "Telugu - Featured & Browse", data = "movie/browse/?lang=telugu"),
+        MainPageData(name = "Telugu - Popular (Past 30 Days)", data = "movie/results/?find=Popularity&lang=telugu&ptype=view&tp=l30d"),
+        MainPageData(name = "Telugu - Top Rated (All Time)", data = "movie/results/?find=Popularity&lang=telugu&ptype=rating&tp=alltime"),
+        MainPageData(name = "Telugu - Most Viewed (All Time)", data = "movie/results/?find=Popularity&lang=telugu&ptype=view&tp=alltime"),
+        MainPageData(name = "Telugu - Staff Picks", data = "movie/results/?find=StaffPick&lang=telugu"),
+        MainPageData(name = "Telugu - Regional Hits", data = "movie/results/?find=RegionalHit&lang=telugu"),
+        MainPageData(name = "Telugu - Year 2026", data = "movie/results/?find=Year&lang=telugu&year=2026"),
+
+        // Hindi
+        MainPageData(name = "Hindi - Featured & Browse", data = "movie/browse/?lang=hindi"),
+        MainPageData(name = "Hindi - Recently Added", data = "movie/results/?find=Recent&lang=hindi"),
+        MainPageData(name = "Hindi - Popular (Past 30 Days)", data = "movie/results/?find=Popularity&lang=hindi&ptype=view&tp=l30d"),
+        MainPageData(name = "Hindi - Top Rated (All Time)", data = "movie/results/?find=Popularity&lang=hindi&ptype=rating&tp=alltime"),
+        MainPageData(name = "Hindi - Most Viewed (All Time)", data = "movie/results/?find=Popularity&lang=hindi&ptype=view&tp=alltime"),
+        MainPageData(name = "Hindi - Staff Picks", data = "movie/results/?find=StaffPick&lang=hindi"),
+        MainPageData(name = "Hindi - Regional Hits", data = "movie/results/?find=RegionalHit&lang=hindi"),
+        MainPageData(name = "Hindi - Year 2026", data = "movie/results/?find=Year&lang=hindi&year=2026"),
+
+        // Malayalam
+        MainPageData(name = "Malayalam - Featured & Browse", data = "movie/browse/?lang=malayalam"),
+        MainPageData(name = "Malayalam - Recently Added", data = "movie/results/?find=Recent&lang=malayalam"),
+        MainPageData(name = "Malayalam - Popular (Past 30 Days)", data = "movie/results/?find=Popularity&lang=malayalam&ptype=view&tp=l30d"),
+        MainPageData(name = "Malayalam - Top Rated (All Time)", data = "movie/results/?find=Popularity&lang=malayalam&ptype=rating&tp=alltime"),
+        MainPageData(name = "Malayalam - Staff Picks", data = "movie/results/?find=StaffPick&lang=malayalam"),
+        MainPageData(name = "Malayalam - Regional Hits", data = "movie/results/?find=RegionalHit&lang=malayalam"),
+
+        // Kannada
+        MainPageData(name = "Kannada - Featured & Browse", data = "movie/browse/?lang=kannada"),
+        MainPageData(name = "Kannada - Recently Added", data = "movie/results/?find=Recent&lang=kannada"),
+        MainPageData(name = "Kannada - Popular (Past 30 Days)", data = "movie/results/?find=Popularity&lang=kannada&ptype=view&tp=l30d"),
+        MainPageData(name = "Kannada - Top Rated (All Time)", data = "movie/results/?find=Popularity&lang=kannada&ptype=rating&tp=alltime"),
+        MainPageData(name = "Kannada - Staff Picks", data = "movie/results/?find=StaffPick&lang=kannada"),
+        MainPageData(name = "Kannada - Regional Hits", data = "movie/results/?find=RegionalHit&lang=kannada"),
+
+        // Bengali, Marathi, Punjabi
+        MainPageData(name = "Bengali - Recently Added", data = "movie/results/?find=Recent&lang=bengali"),
+        MainPageData(name = "Bengali - Popular", data = "movie/results/?find=Popularity&lang=bengali&ptype=view&tp=alltime"),
+        MainPageData(name = "Marathi - Recently Added", data = "movie/results/?find=Recent&lang=marathi"),
+        MainPageData(name = "Marathi - Popular", data = "movie/results/?find=Popularity&lang=marathi&ptype=view&tp=alltime"),
+        MainPageData(name = "Punjabi - Recently Added", data = "movie/results/?find=Recent&lang=punjabi"),
+        MainPageData(name = "Punjabi - Popular", data = "movie/results/?find=Popularity&lang=punjabi&ptype=view&tp=alltime")
     )
 
     companion object {
@@ -250,15 +289,16 @@ class EinthusanProvider : MainAPI() {
         }
 
         if (response == null || response.code !in 200..299) {
-            return newHomePageResponse(
-                listOf(HomePageList(request.name, emptyList())),
-                hasNext = false
-            )
+            return newHomePageResponse(emptyList(), hasNext = false)
         }
 
         val doc = response.document
         val langFromReq = Regex("""lang=([a-zA-Z]+)""").find(request.data)?.groupValues?.get(1)
         val movies = parseMovieList(doc, defaultLanguage = langFromReq)
+
+        if (movies.isEmpty()) {
+            return newHomePageResponse(emptyList(), hasNext = false)
+        }
 
         val hasNext = movies.isNotEmpty() && (
             doc.selectFirst("a.next, .pagination a, div.numerical-nav a") != null ||
@@ -294,9 +334,8 @@ class EinthusanProvider : MainAPI() {
         val doc = app.get(fixedUrl, headers = DEFAULT_HEADERS).document
 
         val summary = doc.selectFirst("section#UIMovieSummary")
-        val rawTitle = summary?.selectFirst("a.title h3")?.text()?.trim()
-            ?: summary?.selectFirst("a.title")?.text()?.trim()
-            ?: doc.selectFirst("h1")?.text()?.trim()
+        val rawTitle = summary?.selectFirst("a.title h2, a.title h3, a.title, h1, h2, h3")?.text()?.trim()
+            ?: doc.selectFirst("h1, h2, h3")?.text()?.trim()
             ?: "Einthusan Movie"
 
         val yearText = summary?.selectFirst(".info p")?.text()
@@ -332,7 +371,12 @@ class EinthusanProvider : MainAPI() {
         val finalPoster = TmdbHelper.getPosterWithLanguage(tmdbPoster, displayLang)
         val finalBackdrop = tmdb?.getBackdropUrl()
         val finalLogo = tmdb?.getLogoUrl(isoLang)
-        val finalPlot = tmdb?.overview?.ifBlank { null } ?: scrapedPlot
+        val basePlot = tmdb?.overview?.ifBlank { null } ?: scrapedPlot
+        val finalPlot = if (!basePlot.isNullOrBlank()) {
+            "Language: $displayLang\n\n$basePlot"
+        } else {
+            "Language: $displayLang"
+        }
         val finalYear = tmdb?.getYear() ?: scrapedYear
         val finalTags = tmdb?.genres?.mapNotNull { it.name }?.ifEmpty { null } ?: scrapedTags
         val finalActors = tmdb?.let { TmdbHelper.toActors(it) }?.ifEmpty { null } ?: scrapedActors
@@ -397,9 +441,7 @@ class EinthusanProvider : MainAPI() {
             }
             val movieUrl = fixUrl(normalizedHref)
 
-            val titleTag = li.selectFirst("a.title h3")
-                ?: li.selectFirst("a.title")
-                ?: li.selectFirst("h3")
+            val titleTag = li.selectFirst("a.title h2, a.title h3, a.title, h2, h3")
             val title = titleTag?.text()?.trim() ?: return@amap null
             if (title.isBlank()) return@amap null
 
