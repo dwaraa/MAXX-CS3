@@ -30,6 +30,14 @@ A high-performance **CloudStream 3** provider plugin providing **TamilDhool** (T
 - **⚡ Adaptive HLS & 1080p Full HD**: Provides both Adaptive HLS playlists (`.m3u8`) and direct MP4 video streams.
 - **🔍 Quick Search & Home Hubs**: Recently Added, Top 30-Day Popular, Top Rated, Staff Picks, and Regional Hits.
 
+### 🌟 SpecialityStream Provider
+- **🌐 TMDB Master Catalog**: Direct integration with TMDB API for global movies, TV shows, and anime.
+- **✨ High-Fidelity Details**: Official posters, 4K backdrops, trailers, complete cast, seasons & episode lists, and recommendations.
+- **🚀 Advanced Decryption & Multi-Embed Resolvers**:
+  - **VidLink.pro**: Pure Kotlin implementation of TweetNaCl XSalsa20-Poly1305 SecretBox encryption for high-speed direct CDN streams (1080p, 720p, 480p, 360p) with multi-language subtitle tracks.
+  - **VidSrc Ecosystem**: Dynamic mirror resolution across `vidsrc.net`, `vidsrc.pm`, `vidsrc.cc`, `vidsrc.xyz`, `vidsrc.vip`.
+  - **Multi-Embed Fallbacks**: `2Embed`, `AutoEmbed`, `MultiEmbed`, `SmashyStream`, `MoviesAPI`.
+
 ---
 
 ## 📁 Project Structure
@@ -43,30 +51,31 @@ TAMILDHOOL-CS3/
 │   └── wrapper/
 │       ├── gradle-wrapper.jar
 │       └── gradle-wrapper.properties
+├── SpecialityStream/
+│   ├── build.gradle.kts            # SpecialityStream plugin metadata
+│   └── src/
+│       └── main/
+│           ├── java/com/specialitystream/crypto/TweetNaclFast.java  # XSalsa20-Poly1305 encryption
+│           └── kotlin/com/specialitystream/
+│               ├── SpecialityStreamPlugin.kt   # Plugin entrypoint
+│               ├── SpecialityStreamProvider.kt # TMDB discovery, load & stream resolution
+│               ├── VidLinkHelper.kt            # VidLink.pro encryption & stream fetcher
+│               ├── EmbedExtractors.kt          # Multi-embed & VidSrc fallback extractors
+│               └── TmdbDto.kt                  # TMDB JSON data transfer models
 ├── TamilDhool/
 │   ├── build.gradle.kts            # TamilDhool plugin metadata & settings
 │   └── src/
-│       └── main/
-│           └── kotlin/
-│               └── com/
-│                   └── tamildhool/
-│                       ├── TamilDhoolPlugin.kt    # Entrypoint (@CloudstreamPlugin)
-│                       ├── TamilDhoolProvider.kt  # TamilDhool MainAPI implementation
-│                       ├── WordPressDto.kt        # WordPress REST API JSON models
-│                       └── Extractors.kt          # Video link resolution engine
+│       └── main/kotlin/com/tamildhool/
 ├── Einthusan/
 │   ├── build.gradle.kts            # Einthusan plugin metadata & settings
 │   └── src/
-│       └── main/
-│           └── kotlin/
-│               └── com/
-│                   └── einthusan/
-│                       ├── EinthusanPlugin.kt     # Entrypoint (@CloudstreamPlugin)
-│                       ├── EinthusanProvider.kt   # Einthusan MainAPI (HD & 4K UHD)
-│                       ├── TmdbHelper.kt          # TMDB mapping for logos, backdrops & metadata
-│                       └── TmdbDto.kt             # TMDB REST API response models
+│       └── main/kotlin/com/einthusan/
+├── TamilUltra/
+│   ├── build.gradle.kts            # TamilUltra plugin metadata & settings
+│   └── src/
+│       └── main/kotlin/com/tamilultra/
 ├── build.gradle.kts                # Root buildscript
-├── settings.gradle.kts             # Gradle subproject configuration (TamilDhool + Einthusan)
+├── settings.gradle.kts             # Subproject configuration
 ├── gradle.properties               # JVM and compiler settings
 ├── repo.json                       # Cloudstream repository descriptor
 └── README.md

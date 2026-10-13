@@ -21,3 +21,4 @@ rootProject.name = "TamilDhoolProvider"
 include(":TamilDhool")
 include(":Einthusan")
 include(":TamilUltra")
+include(":SpecialityStream")

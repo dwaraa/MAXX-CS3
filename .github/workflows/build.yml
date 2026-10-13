@@ -54,4 +54,5 @@ jobs:
           curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/TamilDhool.cs3" || true
           curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/Einthusan.cs3" || true
           curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/TamilUltra.cs3" || true
+          curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/SpecialityStream.cs3" || true
           curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/repo.json" || true
