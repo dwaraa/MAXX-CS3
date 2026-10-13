@@ -146,7 +146,8 @@ data class VidlinkQuality(
     @JsonProperty("type") val type: String? = null,
     @JsonProperty("url") val url: String? = null,
     @JsonProperty("codecName") val codecName: String? = null,
-    @JsonProperty("size") val size: String? = null
+    @JsonProperty("size") val size: String? = null,
+    @JsonProperty("headers") val headers: Map<String, String>? = null
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)

@@ -9,7 +9,6 @@ import com.lagradost.cloudstream3.utils.newExtractorLink
 import com.specialitystream.crypto.TweetNaclFast
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.Base64
 
 object VidLinkHelper {
     private const val KEY_HEX = "c75136c5668bbfe65a7ecad431a745db68b5f381555b38d8f6c699449cf11fcd"
@@ -27,6 +26,33 @@ object VidLinkHelper {
             bytes[i / 2] = hex.substring(i, i + 2).toInt(16).toByte()
         }
         return bytes
+    }
+
+    private fun base64UrlEncode(input: ByteArray): String {
+        val table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        val sb = StringBuilder()
+        var i = 0
+        while (i < input.size) {
+            val b1 = input[i++].toInt() and 0xFF
+            if (i < input.size) {
+                val b2 = input[i++].toInt() and 0xFF
+                if (i < input.size) {
+                    val b3 = input[i++].toInt() and 0xFF
+                    sb.append(table[b1 shr 2])
+                    sb.append(table[((b1 and 0x03) shl 4) or (b2 shr 4)])
+                    sb.append(table[((b2 and 0x0F) shl 2) or (b3 shr 6)])
+                    sb.append(table[b3 and 0x3F])
+                } else {
+                    sb.append(table[b1 shr 2])
+                    sb.append(table[((b1 and 0x03) shl 4) or (b2 shr 4)])
+                    sb.append(table[(b2 and 0x0F) shl 2])
+                }
+            } else {
+                sb.append(table[b1 shr 2])
+                sb.append(table[(b1 and 0x03) shl 4])
+            }
+        }
+        return sb.toString()
     }
 
     fun encryptToken(mediaId: String): String {
@@ -47,7 +73,7 @@ object VidLinkHelper {
         System.arraycopy(nonce, 0, fullPayload, 0, nonce.size)
         System.arraycopy(cipher, 0, fullPayload, nonce.size, cipher.size)
 
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(fullPayload)
+        return base64UrlEncode(fullPayload)
     }
 
     suspend fun getStream(
@@ -83,10 +109,10 @@ object VidLinkHelper {
                         url = playlist,
                         type = ExtractorLinkType.M3U8
                     ) {
-                        this.referer = "https://vidlink.pro/"
+                        this.referer = "https://filmboom.top/"
                         this.headers = mapOf(
-                            "Referer" to "https://vidlink.pro/",
-                            "Origin" to "https://vidlink.pro",
+                            "Referer" to "https://filmboom.top/",
+                            "Origin" to "https://filmboom.top",
                             "User-Agent" to headers["User-Agent"]!!
                         )
                     }
@@ -101,6 +127,16 @@ object VidLinkHelper {
                 val isHls = qUrl.contains(".m3u8")
                 val codec = if (!q.codecName.isNullOrBlank()) " (${q.codecName})" else ""
 
+                val streamHeaders = (q.headers ?: emptyMap()).toMutableMap()
+                val refererVal = streamHeaders["referer"] ?: streamHeaders["Referer"] ?: "https://filmboom.top/"
+                val originVal = streamHeaders["origin"] ?: streamHeaders["Origin"] ?: "https://filmboom.top"
+
+                val playerHeaders = mapOf(
+                    "Referer" to refererVal,
+                    "Origin" to originVal,
+                    "User-Agent" to headers["User-Agent"]!!
+                )
+
                 callback(
                     newExtractorLink(
                         source = "VidLink",
@@ -108,12 +144,8 @@ object VidLinkHelper {
                         url = qUrl,
                         type = if (isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                     ) {
-                        this.referer = "https://vidlink.pro/"
-                        this.headers = mapOf(
-                            "Referer" to "https://vidlink.pro/",
-                            "Origin" to "https://vidlink.pro",
-                            "User-Agent" to headers["User-Agent"]!!
-                        )
+                        this.referer = refererVal
+                        this.headers = playerHeaders
                         this.quality = qualityInt
                     }
                 )
