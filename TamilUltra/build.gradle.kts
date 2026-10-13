@@ -1,4 +1,4 @@
-version = 1
+version = 2
 
 cloudstream {
     description = "Watch Tamil Live TV and Sports Channels (Star Sports, News, Entertainment, Music, Kids) streaming online free"

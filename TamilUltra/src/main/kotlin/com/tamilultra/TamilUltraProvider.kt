@@ -93,71 +93,161 @@ class TamilUltraProvider : MainAPI() {
 
     private fun toSearchResponse(item: WpMovieItem): SearchResponse? {
         val title = cleanTitle(item.title?.rendered)
-        val url = item.link ?: return null
+        val link = item.link ?: return null
         if (title.isBlank()) return null
 
         val poster = item.embedded?.featuredMedia?.firstOrNull()?.sourceUrl
+        val encodedTitle = try { URLEncoder.encode(title, "UTF-8") } catch (_: Exception) { "" }
+        val encodedPoster = try { URLEncoder.encode(poster ?: "", "UTF-8") } catch (_: Exception) { "" }
+        val itemUrl = "$link?id=${item.id}&title=$encodedTitle&poster=$encodedPoster"
 
-        return newLiveSearchResponse(title, url, TvType.Live) {
+        return newLiveSearchResponse(title, itemUrl, TvType.Live) {
             this.posterUrl = poster
         }
     }
 
     override suspend fun load(url: String): LoadResponse? {
-        val response = app.get(url, headers = defaultHeaders)
-        val document = Jsoup.parse(response.text)
-
-        val rawTitle = document.selectFirst("h1")?.text()
-            ?: document.selectFirst(".data h1")?.text()
-            ?: document.title().substringBefore("–").substringBefore("-")
-        val title = cleanTitle(rawTitle)
-
-        val poster = document.selectFirst("meta[property=og:image]")?.attr("content")
-            ?: document.selectFirst(".poster img")?.attr("src")
-
-        val plot = document.selectFirst(".wp-content p")?.text()
-            ?: document.selectFirst("meta[property=og:description]")?.attr("content")
-
-        val tags = document.select(".sgeneros a").map { it.text().trim() }.filter { it.isNotBlank() }
-
-        val optionElements = document.select("li.dooplay_player_option")
+        val queryParams = parseQueryParams(if (url.contains("?")) url.substringAfter("?") else "")
+        val cleanUrl = url.substringBefore("?")
+        var postId = queryParams["id"]?.toLongOrNull()
+        var title = queryParams["title"]?.let { try { URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it } }
+        var poster = queryParams["poster"]?.let { try { URLDecoder.decode(it, "UTF-8") } catch (_: Exception) { it } }
+        var plot: String? = null
+        var backdrop: String? = null
+        val tags = mutableListOf<String>()
         val options = mutableListOf<PlayerOption>()
-        var postId: Long? = null
 
-        for (el in optionElements) {
-            val pId = el.attr("data-post").toLongOrNull()
-            if (pId != null && postId == null) {
-                postId = pId
+        // 1. Fetch channel page HTML
+        val response = try {
+            app.get(cleanUrl, headers = defaultHeaders)
+        } catch (_: Exception) {
+            null
+        }
+
+        if (response != null && response.code in 200..299) {
+            val document = Jsoup.parse(response.text)
+
+            // Extract title from DooPlay markup if missing or invalid
+            if (title.isNullOrBlank() || !isValidTitle(title)) {
+                val foundTitle = document.select(".data > h1, .sheader .data h1, .sheader h1, h1.entry-title")
+                    .map { it.text().trim() }
+                    .firstOrNull { isValidTitle(it) }
+                    ?: document.select("h1, h2, h3")
+                        .map { it.text().trim() }
+                        .firstOrNull { isValidTitle(it) }
+                    ?: cleanTitle(
+                        document.title()
+                            .replace(Regex("(?i)\\s*[-–]\\s*tamilultra(?:\\s*tv)?.*"), "")
+                            .trim()
+                    )
+                if (isValidTitle(foundTitle)) {
+                    title = cleanTitle(foundTitle)
+                }
             }
-            val nume = el.attr("data-nume").ifBlank { "1" }
-            val serverTitle = el.selectFirst(".title")?.text()?.trim()
-                ?: el.text().trim().ifBlank { "Server $nume" }
-            options.add(PlayerOption(nume, serverTitle))
+
+            // Extract poster from HTML if missing or invalid
+            if (poster.isNullOrBlank() || !isValidPoster(poster)) {
+                val posterEl = document.selectFirst(".poster img, .sheader .poster img, img.wp-post-image")
+                val imgUrl = posterEl?.attr("src")?.ifBlank { null }
+                    ?: posterEl?.attr("data-src")?.ifBlank { null }
+                    ?: posterEl?.attr("data-lazy-src")?.ifBlank { null }
+                if (isValidPoster(imgUrl)) {
+                    poster = imgUrl
+                }
+            }
+
+            // Extract backdrop if available
+            val backdropEl = document.selectFirst(".sbackdrop img, .backdrop img")
+            val bgUrl = backdropEl?.attr("src")?.ifBlank { null }
+                ?: backdropEl?.attr("data-src")?.ifBlank { null }
+            if (isValidPoster(bgUrl)) {
+                backdrop = bgUrl
+            }
+
+            // Extract plot
+            plot = document.selectFirst(".wp-content p")?.text()
+                ?: document.selectFirst(".wp-content")?.text()
+                ?: document.selectFirst("meta[property=og:description]")?.attr("content")
+
+            // Extract genres/tags
+            document.select(".sgeneros a").forEach { el ->
+                val tagText = el.text().trim()
+                if (tagText.isNotBlank()) tags.add(tagText)
+            }
+
+            // Extract player options from HTML
+            val optionElements = document.select("li.dooplay_player_option")
+            for (el in optionElements) {
+                val pId = el.attr("data-post").toLongOrNull()
+                if (pId != null && postId == null) {
+                    postId = pId
+                }
+                val nume = el.attr("data-nume").ifBlank { "1" }
+                val serverTitle = el.selectFirst(".title")?.text()?.trim()
+                    ?: el.text().trim().ifBlank { "Server $nume" }
+                options.add(PlayerOption(nume, serverTitle))
+            }
+
+            if (postId == null) {
+                val bodyClass = document.body().className()
+                val match = Regex("postid-(\\d+)").find(bodyClass)
+                    ?: Regex("post-(\\d+)").find(response.text)
+                postId = match?.groupValues?.get(1)?.toLongOrNull()
+            }
+        }
+
+        // 2. Fallback to WordPress REST API via slug if needed
+        val slug = cleanUrl.removeSuffix("/").substringAfterLast("/")
+        if (slug.isNotBlank() && (postId == null || title.isNullOrBlank() || poster.isNullOrBlank())) {
+            val wpRes = try {
+                app.get("$mainUrl/wp-json/wp/v2/movies?slug=$slug&_embed=1", headers = defaultHeaders)
+            } catch (_: Exception) {
+                null
+            }
+            if (wpRes != null && wpRes.code in 200..299) {
+                val wpItems = try {
+                    parseJson<List<WpMovieItem>>(wpRes.text)
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                val item = wpItems.firstOrNull()
+                if (item != null) {
+                    if (postId == null) postId = item.id
+                    if (title.isNullOrBlank()) title = cleanTitle(item.title?.rendered)
+                    if (poster.isNullOrBlank()) poster = item.embedded?.featuredMedia?.firstOrNull()?.sourceUrl
+                    if (tags.isEmpty()) {
+                        item.embedded?.terms?.flatten()?.filter { it.taxonomy == "genres" }?.forEach { term ->
+                            term.name?.let { tags.add(it) }
+                        }
+                    }
+                }
+            }
         }
 
         if (postId == null) {
-            val bodyClass = document.body().className()
-            val match = Regex("postid-(\\d+)").find(bodyClass)
-                ?: Regex("post-(\\d+)").find(response.text)
-            postId = match?.groupValues?.get(1)?.toLongOrNull()
+            postId = cleanUrl.filter { it.isDigit() }.toLongOrNull() ?: return null
         }
 
-        if (postId == null) {
-            return null
+        if (title.isNullOrBlank() || !isValidTitle(title)) {
+            title = slug.replace("-", " ").uppercase()
         }
 
         if (options.isEmpty()) {
             options.add(PlayerOption("1", "Stream 1"))
         }
 
+        val finalPoster = if (isValidPoster(poster)) poster else null
+        val finalBackdrop = if (isValidPoster(backdrop)) backdrop else finalPoster
+
         val passData = TamilUltraPassData(
             postId = postId,
             options = options,
-            pageUrl = url
+            pageUrl = cleanUrl
         )
 
-        return newLiveStreamLoadResponse(title, url, passData.toJson()) {
-            this.posterUrl = poster
+        return newLiveStreamLoadResponse(title, cleanUrl, passData.toJson()) {
+            this.posterUrl = finalPoster
+            this.backgroundPosterUrl = finalBackdrop
             this.plot = plot
             this.tags = tags
         }
@@ -351,6 +441,27 @@ class TamilUltraProvider : MainAPI() {
             }
         }
         return map
+    }
+
+    private fun isValidTitle(text: String?): Boolean {
+        if (text.isNullOrBlank()) return false
+        val lower = text.lowercase()
+        return !lower.contains("refreshing") &&
+                !lower.contains("not working") &&
+                !lower.contains("if chanel") &&
+                !lower.contains("if channel") &&
+                !lower.contains("chanel not") &&
+                !lower.contains("channel not") &&
+                text.length >= 3
+    }
+
+    private fun isValidPoster(url: String?): Boolean {
+        if (url.isNullOrBlank()) return false
+        val lower = url.lowercase()
+        return !lower.contains("tamilultra.png") &&
+                !lower.contains("cropped-logo") &&
+                !lower.contains("default") &&
+                !lower.endsWith("/logo.png")
     }
 
     private fun cleanTitle(title: String?): String {
