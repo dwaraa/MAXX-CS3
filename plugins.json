@@ -41,5 +41,27 @@
         "description": "Watch latest Tamil TV serials and shows (Sun TV, Vijay TV, Zee Tamil, Colors Tamil, etc.) powered by WordPress REST API",
         "url": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/TamilDhool.cs3",
         "name": "TamilDhool"
+    },
+    {
+        "iconUrl": "https://tamilultra.co.uk/wp-content/uploads/2021/05/cropped-LOGO-tamil-ultra-2.png",
+        "fileHash": "sha256-aa23c90f46b2216fd14192d2e487bcb90371ccb27ac2a4bc72135f73193b29c0",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/dwaraa/TAMILDHOOL-CS3",
+        "fileSize": 26118,
+        "status": 1,
+        "language": "ta",
+        "authors": [
+            "dwaraa",
+            "Cloudstream Community"
+        ],
+        "tvTypes": [
+            "LiveTv",
+            "Movie"
+        ],
+        "version": 1,
+        "internalName": "TamilUltra",
+        "description": "Watch Tamil Live TV and Sports Channels (Star Sports, News, Entertainment, Music, Kids) streaming online free",
+        "url": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/TamilUltra.cs3",
+        "name": "TamilUltra"
     }
 ]
