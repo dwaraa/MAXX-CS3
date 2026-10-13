@@ -84,6 +84,11 @@ object VidLinkHelper {
                         type = ExtractorLinkType.M3U8
                     ) {
                         this.referer = "https://vidlink.pro/"
+                        this.headers = mapOf(
+                            "Referer" to "https://vidlink.pro/",
+                            "Origin" to "https://vidlink.pro",
+                            "User-Agent" to headers["User-Agent"]!!
+                        )
                     }
                 )
                 found = true
@@ -104,6 +109,11 @@ object VidLinkHelper {
                         type = if (isHls) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
                     ) {
                         this.referer = "https://vidlink.pro/"
+                        this.headers = mapOf(
+                            "Referer" to "https://vidlink.pro/",
+                            "Origin" to "https://vidlink.pro",
+                            "User-Agent" to headers["User-Agent"]!!
+                        )
                         this.quality = qualityInt
                     }
                 )

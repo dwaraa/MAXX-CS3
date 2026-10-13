@@ -1,11 +1,37 @@
 package com.specialitystream
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.lagradost.cloudstream3.*
+import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.Jsoup
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class VidoraTrack(
+    @JsonProperty("kind") val kind: String? = null,
+    @JsonProperty("file") val file: String? = null,
+    @JsonProperty("label") val label: String? = null,
+    @JsonProperty("language") val language: String? = null
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class VidoraSource(
+    @JsonProperty("file_code") val fileCode: String? = null,
+    @JsonProperty("url") val url: String? = null,
+    @JsonProperty("tracks") val tracks: List<VidoraTrack>? = null
+)
+
+@JsonIgnoreProperties(ignoreUnknown = true)
+data class VidoraResponse(
+    @JsonProperty("result") val result: Boolean? = null,
+    @JsonProperty("type") val type: String? = null,
+    @JsonProperty("title") val title: String? = null,
+    @JsonProperty("sources") val sources: List<VidoraSource>? = null
+)
 
 object EmbedExtractors {
 
@@ -53,9 +79,73 @@ object EmbedExtractors {
         callback: (ExtractorLink) -> Unit,
         subtitleCallback: (SubtitleFile) -> Unit
     ) {
+        val refererPage = if (isMovie) {
+            "https://vidsrc.pm/embed/movie/$tmdbId"
+        } else {
+            "https://vidsrc.pm/embed/tv/$tmdbId/$season/$episode"
+        }
+        val path = if (isMovie) "/v1/movie/$tmdbId" else "/v1/tv/$tmdbId/$season/$episode"
+        val vidoraSources = listOf(
+            "scrapify" to "Alpha",
+            "vaplayer" to "Beta",
+            "lookmovie" to "Spider",
+            "oreon" to "Oreon"
+        )
+
+        val vidoraHeaders = mapOf(
+            "User-Agent" to defaultHeaders["User-Agent"]!!,
+            "Referer" to refererPage,
+            "x-player-key" to "f3b72e73c80c9a996574379798703796a1936efa3516a7105cb0e43048b46b5a"
+        )
+
+        for ((key, label) in vidoraSources) {
+            try {
+                val apiUrl = "https://vidsrc.pm/api/vidora$path?source=$key"
+                val res = app.get(apiUrl, headers = vidoraHeaders, timeout = 7)
+                if (res.code in 200..299) {
+                    val data = try {
+                        parseJson<VidoraResponse>(res.text)
+                    } catch (_: Exception) {
+                        null
+                    }
+                    val streamUrl = data?.sources?.firstOrNull()?.url
+                    if (!streamUrl.isNullOrBlank()) {
+                        val isM3u8 = streamUrl.contains(".m3u8")
+                        callback(
+                            newExtractorLink(
+                                source = "VidSrc ($label)",
+                                name = "VidSrc ($label)",
+                                url = streamUrl,
+                                type = if (isM3u8) ExtractorLinkType.M3U8 else ExtractorLinkType.VIDEO
+                            ) {
+                                this.referer = refererPage
+                                this.headers = mapOf(
+                                    "Referer" to refererPage,
+                                    "User-Agent" to defaultHeaders["User-Agent"]!!
+                                )
+                            }
+                        )
+
+                        data.sources.firstOrNull()?.tracks?.forEach { track ->
+                            val file = track.file ?: return@forEach
+                            val lang = track.label ?: track.language ?: "English"
+                            subtitleCallback(
+                                SubtitleFile(
+                                    lang = lang,
+                                    url = file
+                                )
+                            )
+                        }
+                    }
+                }
+            } catch (_: Throwable) {
+            }
+        }
+
+        // Fallback domains
         val domains = listOf(
-            "https://vidsrc.net",
             "https://vidsrc.pm",
+            "https://vidsrc.net",
             "https://vidsrc.cc/v2",
             "https://vidsrc.xyz",
             "https://vidsrc.vip"
@@ -69,7 +159,7 @@ object EmbedExtractors {
             }
 
             try {
-                val res = app.get(url, headers = defaultHeaders, timeout = 6)
+                val res = app.get(url, headers = defaultHeaders, timeout = 5)
                 if (res.code !in 200..299) continue
 
                 val doc = Jsoup.parse(res.text)

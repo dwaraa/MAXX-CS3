@@ -67,16 +67,6 @@ subprojects {
         }
     }
 
-    tasks.matching { it.name == "compileDex" }.configureEach {
-        dependsOn("compileDebugJavaWithJavac")
-        doFirst {
-            val javacDir = file("${project.layout.buildDirectory.get().asFile}/intermediates/javac/debug/compileDebugJavaWithJavac/classes")
-            val kotlinDir = file("${project.layout.buildDirectory.get().asFile}/tmp/kotlin-classes/debug")
-            if (javacDir.exists()) {
-                javacDir.copyRecursively(kotlinDir, overwrite = true)
-            }
-        }
-    }
 
     dependencies {
         val cloudstream by configurations
