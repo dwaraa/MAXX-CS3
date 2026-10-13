@@ -19,6 +19,7 @@ data class TmdbSearchMovieItem(
     @JsonProperty("poster_path") val posterPath: String? = null,
     @JsonProperty("backdrop_path") val backdropPath: String? = null,
     @JsonProperty("overview") val overview: String? = null,
+    @JsonProperty("original_language") val originalLanguage: String? = null,
     @JsonProperty("vote_average") val voteAverage: Double? = null
 )
 

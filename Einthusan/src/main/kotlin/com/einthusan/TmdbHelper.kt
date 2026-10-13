@@ -19,6 +19,7 @@ object TmdbHelper {
 
     fun cleanMovieTitle(raw: String): String {
         return raw
+            .replace(Regex("""(?i)\b(?:Tamil|Telugu|Hindi|Malayalam|Kannada|Bengali|Marathi|Punjabi)\b"""), " ")
             .replace(Regex("""(?i)\b(?:Dubbed|Must\s*Watch|Staff\s*Pick|Regional\s*Hit)\b"""), " ")
             .replace(Regex("""\b(19\d{2}|20\d{2})\b"""), " ")
             .replace(Regex("""[\[\]\(\)]"""), " ")
@@ -67,6 +68,66 @@ object TmdbHelper {
         }
     }
 
+    private val INDIAN_LANGS = setOf("ta", "te", "hi", "ml", "kn", "bn", "mr", "pa")
+
+    private fun normalizeTitle(s: String): String {
+        return s.lowercase().replace(Regex("""[^a-z0-9]"""), "")
+    }
+
+    private fun findBestMatch(
+        cleanTitle: String,
+        results: List<TmdbSearchMovieItem>,
+        expectedYear: Int?,
+        expectedLang: String
+    ): TmdbSearchMovieItem? {
+        val cleanNorm = normalizeTitle(cleanTitle)
+        if (cleanNorm.isBlank()) return null
+
+        var bestScore = -1
+        var bestItem: TmdbSearchMovieItem? = null
+
+        for (item in results) {
+            val tNorm = normalizeTitle(item.title ?: "")
+            val otNorm = normalizeTitle(item.originalTitle ?: "")
+
+            val isExact = tNorm == cleanNorm || otNorm == cleanNorm
+            val isStarts = tNorm.startsWith(cleanNorm) || otNorm.startsWith(cleanNorm)
+            val isContains = (cleanNorm.length >= 4 && (tNorm.contains(cleanNorm) || otNorm.contains(cleanNorm)))
+
+            if (!isExact && !isStarts && !isContains) continue
+
+            var score = 0
+            if (isExact) score += 100
+            else if (isStarts) score += 50
+            else if (isContains) score += 25
+
+            val rLang = item.originalLanguage?.lowercase()?.trim()
+            if (rLang == expectedLang) {
+                score += 50
+            } else if (rLang != null && INDIAN_LANGS.contains(rLang)) {
+                score += 30
+            }
+
+            val rYear = item.releaseDate?.take(4)?.toIntOrNull()
+            if (expectedYear != null && rYear != null) {
+                val diff = kotlin.math.abs(expectedYear - rYear)
+                if (diff == 0) score += 50
+                else if (diff <= 1) score += 25
+                else if (diff > 3) score -= 60
+            }
+
+            val pop = item.voteAverage ?: 0.0
+            score += pop.toInt().coerceIn(0, 10)
+
+            if (score > bestScore) {
+                bestScore = score
+                bestItem = item
+            }
+        }
+
+        return if (bestScore >= 50) bestItem else null
+    }
+
     suspend fun getMovieMetadata(
         title: String,
         year: Int? = null,
@@ -75,36 +136,34 @@ object TmdbHelper {
         val clean = cleanMovieTitle(title)
         if (clean.isBlank()) return null
 
-        val cacheKey = "$clean:$year".lowercase()
+        val cacheKey = "$clean:$year:$preferredLang".lowercase()
         if (metadataCache.containsKey(cacheKey)) {
             return metadataCache[cacheKey]
         }
 
-        val detail = fetchMetadata(clean, year)
+        val detail = fetchMetadata(clean, year, preferredLang)
         metadataCache[cacheKey] = detail
         return detail
     }
 
-    private suspend fun fetchMetadata(cleanTitle: String, year: Int?): TmdbMovieDetail? {
+    private suspend fun fetchMetadata(cleanTitle: String, year: Int?, preferredLang: String): TmdbMovieDetail? {
         val encodedTitle = URLEncoder.encode(cleanTitle, "UTF-8")
 
-        // 1. Search with year if available
-        var searchUrl = "$TMDB_BASE_URL/search/movie?api_key=$TMDB_API_KEY&query=$encodedTitle"
+        val searchUrls = mutableListOf<String>()
         if (year != null && year > 1900) {
-            searchUrl += "&year=$year"
+            searchUrls.add("$TMDB_BASE_URL/search/movie?api_key=$TMDB_API_KEY&query=$encodedTitle&year=$year")
+        }
+        searchUrls.add("$TMDB_BASE_URL/search/movie?api_key=$TMDB_API_KEY&query=$encodedTitle")
+
+        var matchedMovie: TmdbSearchMovieItem? = null
+        for (url in searchUrls) {
+            val results = searchMovies(url)
+            matchedMovie = findBestMatch(cleanTitle, results, year, preferredLang)
+            if (matchedMovie != null) break
         }
 
-        var results = searchMovies(searchUrl)
+        if (matchedMovie == null) return null
 
-        // 2. Fallback: Search without year constraint if no match found
-        if (results.isEmpty() && year != null) {
-            val fallbackUrl = "$TMDB_BASE_URL/search/movie?api_key=$TMDB_API_KEY&query=$encodedTitle"
-            results = searchMovies(fallbackUrl)
-        }
-
-        val matchedMovie = results.firstOrNull() ?: return null
-
-        // 3. Fetch comprehensive details, logos, posters, backdrops, cast, trailers, recommendations
         return fetchMovieDetails(matchedMovie.id)
     }
 

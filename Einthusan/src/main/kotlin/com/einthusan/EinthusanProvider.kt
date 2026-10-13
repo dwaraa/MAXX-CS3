@@ -342,6 +342,9 @@ class EinthusanProvider : MainAPI() {
         val scrapedYear = Regex("""\b(19\d{2}|20\d{2})\b""").find(yearText ?: "")?.value?.toIntOrNull()
         val scrapedPlot = summary?.selectFirst("p.synopsis")?.text()?.trim()
 
+        val scrapedCover = summary?.selectFirst("a#movie_cover_link img, .block1 img, img")?.attr("src")?.let { fixUrl(it) }
+            ?: doc.selectFirst("img.cover, a#movie_cover_link img, img")?.attr("src")?.let { fixUrl(it) }
+
         val displayLang = extractLanguage(fixedUrl, yearText ?: doc.text())
         val isoLang = TmdbHelper.toIso6391(displayLang)
 
@@ -367,21 +370,33 @@ class EinthusanProvider : MainAPI() {
             "$baseTitle ($displayLang)"
         }
 
-        val tmdbPoster = tmdb?.getPosterUrl(isoLang)
-        val finalPoster = TmdbHelper.getPosterWithLanguage(tmdbPoster, displayLang)
-        val finalBackdrop = tmdb?.getBackdropUrl()
+        val posterCandidate = tmdb?.getPosterUrl(isoLang) ?: scrapedCover
+        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, displayLang)
+        val finalBackdrop = tmdb?.getBackdropUrl() ?: scrapedCover
         val finalLogo = tmdb?.getLogoUrl(isoLang)
         val basePlot = tmdb?.overview?.ifBlank { null } ?: scrapedPlot
-        val finalPlot = if (!basePlot.isNullOrBlank()) {
-            "Language: $displayLang\n\n$basePlot"
-        } else {
-            "Language: $displayLang"
-        }
         val finalYear = tmdb?.getYear() ?: scrapedYear
+        val finalPlot = buildString {
+            append("Language: $displayLang • Year: ${finalYear ?: "N/A"}")
+            if (!basePlot.isNullOrBlank()) {
+                append("\n\n")
+                append(basePlot)
+            }
+        }
         val finalTags = tmdb?.genres?.mapNotNull { it.name }?.ifEmpty { null } ?: scrapedTags
         val finalActors = tmdb?.let { TmdbHelper.toActors(it) }?.ifEmpty { null } ?: scrapedActors
         val finalTrailers = tmdb?.let { TmdbHelper.toTrailers(it) }?.toMutableList() ?: mutableListOf()
-        val finalRecs = tmdb?.let { TmdbHelper.toRecommendations(it, this) } ?: emptyList()
+
+        // Fetch real recommendations from Einthusan in the same language (only movies that exist on Einthusan)
+        val finalRecs = try {
+            val recUrl = "$mainUrl/movie/results/?find=Popularity&lang=${displayLang.lowercase()}&ptype=view&tp=l30d"
+            val recDoc = app.get(recUrl, headers = DEFAULT_HEADERS).document
+            parseMovieList(recDoc, defaultLanguage = displayLang)
+                .filter { it.url != fixedUrl }
+                .take(15)
+        } catch (_: Exception) {
+            emptyList()
+        }
 
         return newMovieLoadResponse(finalTitle, fixedUrl, TvType.Movie, fixedUrl) {
             this.posterUrl = finalPoster
@@ -458,14 +473,16 @@ class EinthusanProvider : MainAPI() {
                 "$cleanTitle ($cardLang)"
             }
 
-            // Always resolve TMDB poster with language badge
+            val scrapedCover = li.selectFirst("a#movie_cover_link img, .block1 img, img")?.attr("src")?.let { fixUrl(it) }
+
+            // Resolve TMDB poster with language badge, cleanly falling back to Einthusan native cover
             val tmdb = try {
                 TmdbHelper.getMovieMetadata(cleanTitle, cardYear, isoLang)
             } catch (_: Exception) {
                 null
             }
-            val tmdbPoster = tmdb?.getPosterUrl(isoLang)
-            val finalPosterUrl = TmdbHelper.getPosterWithLanguage(tmdbPoster, cardLang)
+            val posterCandidate = tmdb?.getPosterUrl(isoLang) ?: scrapedCover
+            val finalPosterUrl = TmdbHelper.getPosterWithLanguage(posterCandidate, cardLang)
 
             newMovieSearchResponse(displayTitle, movieUrl, TvType.Movie) {
                 this.posterUrl = finalPosterUrl
