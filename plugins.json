@@ -1,10 +1,31 @@
 [
     {
-        "iconUrl": "https://uptime.com/media/website_profiles/tamildhool.com.png",
-        "fileHash": "sha256-44f46a4bff38419065ec06396c14b1d76420e3ba7489cc95dd8c53ecce59d89d",
+        "iconUrl": "https://einthusan.tv/etc/favicon-32x32.png",
+        "fileHash": "sha256-37a345724e7ea63dbd8b096c4f4ecfffdaced2aaebba792fd7603db6074120aa",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/TAMILDHOOL-CS3",
-        "fileSize": 47225,
+        "fileSize": 40593,
+        "status": 1,
+        "language": "ta",
+        "authors": [
+            "dwaraa",
+            "Cloudstream Community"
+        ],
+        "tvTypes": [
+            "Movie"
+        ],
+        "version": 1,
+        "internalName": "Einthusan",
+        "description": "Watch South Asian movies with 4K UHD and HD streaming, mapped with TMDB transparent logos, backdrops, trailers, and rich metadata",
+        "url": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/Einthusan.cs3",
+        "name": "Einthusan"
+    },
+    {
+        "iconUrl": "https://uptime.com/media/website_profiles/tamildhool.com.png",
+        "fileHash": "sha256-793289f463a3821674efb244d18a84d6cf4fc874fef5efceaa3618d18563c5ee",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/dwaraa/TAMILDHOOL-CS3",
+        "fileSize": 47298,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -15,7 +36,7 @@
             "TvSeries",
             "Movie"
         ],
-        "version": 9,
+        "version": 10,
         "internalName": "TamilDhool",
         "description": "Watch latest Tamil TV serials and shows (Sun TV, Vijay TV, Zee Tamil, Colors Tamil, etc.) powered by WordPress REST API",
         "url": "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/TamilDhool.cs3",

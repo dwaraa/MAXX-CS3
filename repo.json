@@ -1,7 +1,7 @@
 {
   "name": "TamilDhool Provider",
   "iconUrl": "https://uptime.com/media/website_profiles/tamildhool.com.png",
-  "description": "Cloudstream 3 Provider for TamilDhool (Sun TV, Vijay TV, Zee Tamil, Colors Tamil Serials and Shows) powered by WordPress REST API",
+  "description": "Cloudstream 3 Provider for TamilDhool and Einthusan (Tamil TV serials, shows, and South Asian movies with 4K UHD and HD playback)",
   "manifestVersion": 1,
   "pluginLists": [
     "https://raw.githubusercontent.com/dwaraa/TAMILDHOOL-CS3/builds/plugins.json"
