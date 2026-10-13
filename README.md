@@ -1,6 +1,6 @@
-# TamilDhool & Einthusan CloudStream 3 Plugin
+# MAXX CloudStream 3 Plugins (MAXX-CS3)
 
-A high-performance **CloudStream 3** provider plugin providing **TamilDhool** (Tamil TV Serials and Shows via WordPress REST API) and **Einthusan** (South Asian Movies with 4K UHD and HD playback).
+A high-performance **CloudStream 3** plugin repository featuring **SpecialityStream** (TMDB catalog with VidLink.pro & multi-embeds), **Einthusan** (South Asian Movies with 4K UHD and HD playback), **TamilDhool** (Tamil TV Serials and Shows via WordPress REST API), and **TamilUltra** (Live TV channels).
 
 ---
 
@@ -110,13 +110,13 @@ The compiled plugin `.cs3` artifact will be located in:
 
 ## 🚀 Publishing to GitHub & Adding to CloudStream
 
-1. Create a new repository on GitHub (e.g. `TAMILDHOOL-CS3`).
+1. Repository on GitHub: `MAXX-CS3`.
 2. Push this repository to `main`:
    ```bash
    git init
    git add .
-   git commit -m "Initial commit for TamilDhool CloudStream plugin"
-   git remote add origin https://github.com/<your-username>/TAMILDHOOL-CS3.git
+   git commit -m "Update MAXX-CS3 repository"
+   git remote add origin https://github.com/dwaraa/MAXX-CS3.git
    git push -u origin main
    ```
 3. Enable **Read and write permissions** for GitHub Actions in your repository:
@@ -125,12 +125,12 @@ The compiled plugin `.cs3` artifact will be located in:
 4. When the GitHub Action completes, it pushes the compiled `.cs3` files and `plugins.json` to the `builds` branch.
 5. In CloudStream 3 on your Android phone or TV:
    - Navigate to **Settings** > **Extensions** > **Add Repository**.
-   - Enter Repository Name: `TamilDhool`
+   - Enter Repository Name: `MAXX`
    - Enter Repository URL:
      ```
-     https://raw.githubusercontent.com/<your-username>/TAMILDHOOL-CS3/builds/repo.json
+     https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/repo.json
      ```
-   - Click **Download** on TamilDhool and enjoy!
+   - Click **Download** on your desired providers and enjoy!
 
 ---
 

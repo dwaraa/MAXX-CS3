@@ -37,7 +37,7 @@ subprojects {
     apply(plugin = "com.lagradost.cloudstream3.gradle")
 
     cloudstream {
-        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "dwaraa/TAMILDHOOL-CS3")
+        setRepo(System.getenv("GITHUB_REPOSITORY") ?: "dwaraa/MAXX-CS3")
     }
 
     android {
