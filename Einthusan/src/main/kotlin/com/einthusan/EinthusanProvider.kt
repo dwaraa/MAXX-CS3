@@ -135,7 +135,62 @@ class EinthusanProvider : MainAPI() {
             var standardFound = false
             var uhdFound = false
 
-            // 1. Fetch movie watch page to acquire CSRF tokens, pingables and session cookies
+            // 1. Direct CDN MP4 extraction FIRST for all movies:
+            // UHD: https://cdn2.einthusan.io/etv/content/B$movieId.mp4
+            // HD:  https://cdn2.einthusan.io/etv/content/D$movieId.mp4
+            val cdnHosts = listOf("cdn2", "cdn1")
+            for (cdn in cdnHosts) {
+                if (!uhdFound) {
+                    val uhdUrl = "https://$cdn.einthusan.io/etv/content/B$movieId.mp4"
+                    try {
+                        val head = app.head(uhdUrl, headers = DEFAULT_HEADERS, timeout = 4)
+                        if (head.code in 200..299) {
+                            callback(
+                                newExtractorLink(
+                                    source = "Einthusan 4K UHD",
+                                    name = "Einthusan - 4K UHD (Direct MP4)",
+                                    url = uhdUrl,
+                                    type = ExtractorLinkType.VIDEO
+                                ) {
+                                    this.referer = "https://einthusan.tv/"
+                                    this.quality = Qualities.P2160.value
+                                }
+                            )
+                            uhdFound = true
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                if (!standardFound) {
+                    val hdUrl = "https://$cdn.einthusan.io/etv/content/D$movieId.mp4"
+                    try {
+                        val head = app.head(hdUrl, headers = DEFAULT_HEADERS, timeout = 4)
+                        if (head.code in 200..299) {
+                            callback(
+                                newExtractorLink(
+                                    source = "Einthusan HD",
+                                    name = "Einthusan - 1080p Full HD (Direct MP4)",
+                                    url = hdUrl,
+                                    type = ExtractorLinkType.VIDEO
+                                ) {
+                                    this.referer = "https://einthusan.tv/"
+                                    this.quality = Qualities.P1080.value
+                                }
+                            )
+                            standardFound = true
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                if (uhdFound && standardFound) break
+            }
+
+            // If direct links were found on CDN, return them immediately
+            if (uhdFound || standardFound) {
+                return true
+            }
+
+            // 2. Fallback: Fetch movie watch page to acquire CSRF tokens, pingables and AJAX session links
             try {
                 val pageResp = app.get(fixedUrl, headers = DEFAULT_HEADERS, timeout = 30)
                 val pageDoc = pageResp.document
@@ -234,31 +289,8 @@ class EinthusanProvider : MainAPI() {
                 }
             } catch (_: Exception) {}
 
-            // 2. Direct UHD (4K) Link Detection on CDNs
-            for (cdn in listOf("cdn2", "cdn1")) {
-                val uhdUrl = "https://$cdn.einthusan.io/etv/content/B$movieId.mp4"
-                try {
-                    val head = app.head(uhdUrl, headers = DEFAULT_HEADERS, timeout = 4)
-                    if (head.code in 200..299) {
-                        callback(
-                            newExtractorLink(
-                                source = "Einthusan 4K UHD",
-                                name = "Einthusan - 4K UHD (Direct MP4)",
-                                url = uhdUrl,
-                                type = ExtractorLinkType.VIDEO
-                            ) {
-                                this.referer = "https://einthusan.tv/"
-                                this.quality = Qualities.P2160.value
-                            }
-                        )
-                        uhdFound = true
-                        break
-                    }
-                } catch (_: Exception) {}
-            }
-
-            // 3. Fallback CDN link for numeric IDs if AJAX did not return links
-            if (!standardFound && !uhdFound && movieId.all { it.isDigit() }) {
+            // 3. Fallback direct link attempt for any movie ID if still not found
+            if (!standardFound && !uhdFound) {
                 val fallbackUrl = "https://cdn2.einthusan.io/etv/content/D$movieId.mp4"
                 callback(
                     newExtractorLink(
