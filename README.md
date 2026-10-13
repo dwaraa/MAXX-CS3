@@ -1,11 +1,12 @@
-# TamilDhool CloudStream 3 Provider
+# TamilDhool & Einthusan CloudStream 3 Plugin
 
-A high-performance **CloudStream 3** provider plugin for **TamilDhool**, built on top of the **WordPress REST API** (`/wp-json/wp/v2/`).
+A high-performance **CloudStream 3** provider plugin providing **TamilDhool** (Tamil TV Serials and Shows via WordPress REST API) and **Einthusan** (South Asian Movies with 4K UHD and HD playback).
 
 ---
 
 ## ✨ Features
 
+### 📺 TamilDhool Provider
 - **⚡ Fast WordPress REST API**: Fetches serials, shows, posters, and episodes directly via JSON endpoints rather than slow HTML scraping.
 - **📺 Comprehensive Channel Coverage**:
   - **Sun TV Serials** (Kayal, Singapennae, Sundari, Vanathai Pola, Marumagal, Iniya, etc.)
@@ -14,12 +15,20 @@ A high-performance **CloudStream 3** provider plugin for **TamilDhool**, built o
   - **Colors Tamil & Kalaignar TV**
   - **Tamil Web Series & Reality Shows**
 - **🔁 Serial Episode Aggregation**: Opening an episode automatically discovers and lists previous recent episodes from that serial's category for easy binge-watching.
-- **🎥 Multi-Host Video Extraction**:
-  - Dailymotion (`geo.dailymotion.com`, `dailymotion.com/embed`)
-  - YouTube (`youtube.com/embed`)
-  - PlayVK & VK video servers (`playvk.com`, `vk.com/video_ext.php`)
-  - Streamwish, Filelions, Vidguard, Voe, Doodstream
-  - Internal TamilDhool player wrappers and direct `.m3u8` / `.mp4` streams.
+- **🎥 Multi-Host Video Extraction**: Dailymotion, YouTube, PlayVK / VK, Streamwish, Filelions, Vidguard, Voe, Doodstream, direct `.m3u8` / `.mp4` streams.
+
+### 🎬 Einthusan Provider
+- **🍿 Multi-Language Catalog**: Tamil, Telugu, Hindi, Malayalam, and Kannada movie collections.
+- **✨ TMDB Rich Metadata & Logo Mapping**:
+  - **Transparent Title Logos**: Automatically maps transparent PNG movie logos (`logoUrl`) from TMDB.
+  - **Ultra-HD Backdrops & Posters**: Replaces low-res covers with crystal-clear TMDB theatrical posters and 4K backdrops (`backgroundPosterUrl`).
+  - **Rich Metadata & Cast**: Fetches official plot synopses, release year, runtime duration, TMDB rating score, and cast members complete with headshot pictures.
+  - **Trailers & Recommendations**: Embeds official YouTube movie trailers and related title recommendations directly on the details screen.
+  - **Sync Integration**: Maps `tmdb` and `imdb` IDs for seamless Trakt / Simkl tracking synchronization.
+- **💎 4K UHD Direct MP4 Extraction**: Direct high-speed CDN playback without premium account lock (`B{movieId}.mp4` static CDN detection).
+- **🚀 Obfuscation Decryption Engine**: Automatically extracts `data-pageid` (with HTML entity unescaping) and `data-ejpingables`, posts to internal gorilla AJAX endpoints, and unscrambles obfuscated base64 `EJLinks`.
+- **⚡ Adaptive HLS & 1080p Full HD**: Provides both Adaptive HLS playlists (`.m3u8`) and direct MP4 video streams.
+- **🔍 Quick Search & Home Hubs**: Recently Added, Top 30-Day Popular, Top Rated, Staff Picks, and Regional Hits.
 
 ---
 
@@ -35,18 +44,29 @@ TAMILDHOOL-CS3/
 │       ├── gradle-wrapper.jar
 │       └── gradle-wrapper.properties
 ├── TamilDhool/
-│   ├── build.gradle.kts            # Cloudstream plugin metadata & settings
+│   ├── build.gradle.kts            # TamilDhool plugin metadata & settings
 │   └── src/
 │       └── main/
 │           └── kotlin/
 │               └── com/
 │                   └── tamildhool/
 │                       ├── TamilDhoolPlugin.kt    # Entrypoint (@CloudstreamPlugin)
-│                       ├── TamilDhoolProvider.kt  # MainAPI implementation
+│                       ├── TamilDhoolProvider.kt  # TamilDhool MainAPI implementation
 │                       ├── WordPressDto.kt        # WordPress REST API JSON models
 │                       └── Extractors.kt          # Video link resolution engine
+├── Einthusan/
+│   ├── build.gradle.kts            # Einthusan plugin metadata & settings
+│   └── src/
+│       └── main/
+│           └── kotlin/
+│               └── com/
+│                   └── einthusan/
+│                       ├── EinthusanPlugin.kt     # Entrypoint (@CloudstreamPlugin)
+│                       ├── EinthusanProvider.kt   # Einthusan MainAPI (HD & 4K UHD)
+│                       ├── TmdbHelper.kt          # TMDB mapping for logos, backdrops & metadata
+│                       └── TmdbDto.kt             # TMDB REST API response models
 ├── build.gradle.kts                # Root buildscript
-├── settings.gradle.kts             # Gradle subproject configuration
+├── settings.gradle.kts             # Gradle subproject configuration (TamilDhool + Einthusan)
 ├── gradle.properties               # JVM and compiler settings
 ├── repo.json                       # Cloudstream repository descriptor
 └── README.md

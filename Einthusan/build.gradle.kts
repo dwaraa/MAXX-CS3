@@ -1,0 +1,10 @@
+version = 1
+
+cloudstream {
+    description = "Watch South Asian movies with 4K UHD and HD streaming, mapped with TMDB transparent logos, backdrops, trailers, and rich metadata"
+    authors = listOf("dwaraa", "Cloudstream Community")
+    language = "ta"
+    status = 1 // 1: OK, 2: Slow, 3: Beta, 0: Down
+    tvTypes = listOf("Movie")
+    iconUrl = "https://einthusan.tv/etc/favicon-32x32.png"
+}

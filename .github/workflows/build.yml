@@ -34,7 +34,7 @@ jobs:
           chmod +x gradlew
           ./gradlew make makePluginsJson
           mkdir -p dist
-          cp TamilDhool/build/*.cs3 dist/ || cp **/build/*.cs3 dist/ || true
+          cp */build/*.cs3 dist/ || cp **/build/*.cs3 dist/ || true
           cp build/plugins.json dist/ || true
           cp repo.json dist/ || true
 
@@ -52,4 +52,5 @@ jobs:
           sleep 5
           curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/plugins.json" || true
           curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/TamilDhool.cs3" || true
+          curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/Einthusan.cs3" || true
           curl -s "https://purge.jsdelivr.net/gh/${{ github.repository }}@builds/repo.json" || true

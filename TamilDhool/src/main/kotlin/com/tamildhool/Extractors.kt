@@ -460,7 +460,9 @@ object TamilDhoolExtractor {
                 lower.contains("embed.php") ||
                 lower.contains("play.php") ||
                 lower.contains(".m3u8") ||
-                lower.contains(".mp4")
+                lower.contains(".mp4") ||
+                lower.contains("einthusan.tv") ||
+                lower.contains("einthusan.io")
     }
 
     private fun resolveRelativeUrl(url: String, baseUrl: String): String {

@@ -1,5 +1,7 @@
 *.iml
 .gradle
+.kotlin/
+.gitignore
 /local.properties
 /.idea/
 .DS_Store
@@ -12,5 +14,7 @@ build/
 builds/
 *.tmp.ps1
 *.ps1
+*.md
+*.txt
 MAIN-RESLOVER/
-embed-*.html
+*.html

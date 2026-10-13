@@ -41,7 +41,7 @@ subprojects {
     }
 
     android {
-        namespace = "com.tamildhool"
+        namespace = "com.${project.name.lowercase()}"
 
         defaultConfig {
             minSdk = 21
