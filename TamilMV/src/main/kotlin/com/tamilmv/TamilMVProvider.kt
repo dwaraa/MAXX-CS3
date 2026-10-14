@@ -467,22 +467,33 @@ class TamilMVProvider : MainAPI() {
         val seasonMatch = Regex("""(?i)\bS(\d{1,2})\b""").find(pageTitle)
         val seasonNum = seasonMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
 
-        // 1. Check if the post contains individual episode magnets (e.g. EP01, EP02...)
-        val discoveredEps = mutableSetOf<Int>()
-        if (commentWrap != null) {
-            for (a in commentWrap.select("a[href^=magnet:]")) {
-                val dn = extractQueryParam(a.attr("href"), "dn") ?: ""
-                if (!dn.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?"""))) {
-                    val m = Regex("""(?i)\bEP\s*0*(\d+)\b""").find(dn)
-                    if (m != null) {
-                        m.groupValues[1].toIntOrNull()?.let { discoveredEps.add(it) }
-                    }
+        val allMagnets = commentWrap?.select("a[href^=magnet:]") ?: emptyList()
+        val allTorrents = commentWrap?.select("a[href*=attachment.php], a[href*=.torrent]") ?: emptyList()
+
+        // 1. Check for individual episode numbers across all magnets and torrents
+        val individualEps = mutableSetOf<Int>()
+        for (a in allMagnets) {
+            val rawHref = a.attr("href").replace("&amp;", "&")
+            val dn = extractQueryParam(rawHref, "dn") ?: ""
+            if (!dn.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?"""))) {
+                val m = Regex("""(?i)\bEP\s*0*(\d+)\b""").find(dn)
+                if (m != null) {
+                    m.groupValues[1].toIntOrNull()?.let { individualEps.add(it) }
+                }
+            }
+        }
+        for (a in allTorrents) {
+            val text = a.text().trim()
+            if (!text.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?"""))) {
+                val m = Regex("""(?i)\bEP\s*0*(\d+)\b""").find(text)
+                if (m != null) {
+                    m.groupValues[1].toIntOrNull()?.let { individualEps.add(it) }
                 }
             }
         }
 
-        if (discoveredEps.size > 1) {
-            return discoveredEps.sorted().map { epNum ->
+        if (individualEps.size > 1) {
+            return individualEps.sorted().map { epNum ->
                 newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=1") {
                     this.name = "Episode $epNum"
                     this.season = seasonNum
@@ -492,16 +503,52 @@ class TamilMVProvider : MainAPI() {
             }
         }
 
-        // 2. Check for range in title or text like EP (01-06) or EP(01-10)
-        val rangeMatch = Regex("""(?i)\bEP\s*\(?(\d+)\s*[-–]\s*(\d+)\)?""").find(pageTitle)
-            ?: commentWrap?.let { Regex("""(?i)\bEP\s*\(?(\d+)\s*[-–]\s*(\d+)\)?""").find(it.text()) }
+        // 2. Discover all ranges across magnets, torrents, and title
+        val discoveredRanges = mutableListOf<Pair<Int, Int>>()
+        for (a in allMagnets) {
+            val rawHref = a.attr("href").replace("&amp;", "&")
+            val dn = extractQueryParam(rawHref, "dn") ?: ""
+            val m = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(dn)
+            if (m != null) {
+                val s = m.groupValues[1].toIntOrNull()
+                val e = m.groupValues[2].toIntOrNull()
+                if (s != null && e != null && e >= s) {
+                    discoveredRanges.add(s to e)
+                }
+            }
+        }
+        for (a in allTorrents) {
+            val text = a.text().trim()
+            val m = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(text)
+            if (m != null) {
+                val s = m.groupValues[1].toIntOrNull()
+                val e = m.groupValues[2].toIntOrNull()
+                if (s != null && e != null && e >= s) {
+                    discoveredRanges.add(s to e)
+                }
+            }
+        }
+        val titleRangeMatch = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(pageTitle)
+        if (titleRangeMatch != null) {
+            val s = titleRangeMatch.groupValues[1].toIntOrNull()
+            val e = titleRangeMatch.groupValues[2].toIntOrNull()
+            if (s != null && e != null && e >= s) {
+                discoveredRanges.add(s to e)
+            }
+        }
 
-        if (rangeMatch != null) {
-            val start = rangeMatch.groupValues[1].toIntOrNull() ?: 1
-            val end = rangeMatch.groupValues[2].toIntOrNull() ?: start
-            if (end >= start && end - start < 100) {
-                return (start..end).map { epNum ->
-                    newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=$start") {
+        if (discoveredRanges.isNotEmpty()) {
+            val minEp = discoveredRanges.minOf { it.first }
+            val maxEp = discoveredRanges.maxOf { it.second }
+            if (maxEp >= minEp && (maxEp - minEp) < 150) {
+                return (minEp..maxEp).map { epNum ->
+                    // Find the matching batch startEp for this episode
+                    val matchingRange = discoveredRanges.filter { it.first <= epNum && epNum <= it.second }
+                        .minByOrNull { it.second - it.first }
+                    val batchStart = matchingRange?.first ?: minEp
+                    val batchEnd = matchingRange?.second ?: maxEp
+
+                    newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=$batchStart&endEp=$batchEnd") {
                         this.name = "Episode $epNum"
                         this.season = seasonNum
                         this.episode = epNum
@@ -516,7 +563,7 @@ class TamilMVProvider : MainAPI() {
         if (singleMatch != null) {
             val epNum = singleMatch.groupValues[1].toIntOrNull() ?: 1
             return listOf(
-                newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=$epNum") {
+                newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=$epNum&endEp=$epNum") {
                     this.name = "Episode $epNum"
                     this.season = seasonNum
                     this.episode = epNum
@@ -527,7 +574,7 @@ class TamilMVProvider : MainAPI() {
 
         // 4. Default single episode for the whole batch
         return listOf(
-            newEpisode("$topicUrl#ep=1&season=$seasonNum&startEp=1") {
+            newEpisode("$topicUrl#ep=1&season=$seasonNum&startEp=1&endEp=1") {
                 this.name = "Full Season / Release"
                 this.season = seasonNum
                 this.episode = 1
@@ -551,6 +598,7 @@ class TamilMVProvider : MainAPI() {
 
         val targetEp = params["ep"]?.toIntOrNull()
         val startEp = params["startEp"]?.toIntOrNull() ?: 1
+        val endEp = params["endEp"]?.toIntOrNull() ?: startEp
 
         val res = try {
             app.get(topicUrl, headers = DEFAULT_HEADERS)
@@ -605,9 +653,15 @@ class TamilMVProvider : MainAPI() {
                 }
             }
 
-            if (epPattern != null && nameCandidate.isNotBlank()) {
-                val isRange = nameCandidate.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?"""))
-                if (!isRange && !epPattern.containsMatchIn(nameCandidate)) {
+            if (targetEp != null && nameCandidate.isNotBlank()) {
+                val rangeMatch = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(nameCandidate)
+                if (rangeMatch != null) {
+                    val s = rangeMatch.groupValues[1].toIntOrNull() ?: 1
+                    val e = rangeMatch.groupValues[2].toIntOrNull() ?: s
+                    if (targetEp !in s..e) {
+                        return@mapNotNull null
+                    }
+                } else if (epPattern != null && !epPattern.containsMatchIn(nameCandidate)) {
                     return@mapNotNull null
                 }
             }
@@ -657,88 +711,102 @@ class TamilMVProvider : MainAPI() {
 
         // 2. Process all TORRENT / MAGNET links second
         val allMagnets = commentWrap.select("a[href^=magnet:]").mapNotNull { a ->
-            val url = a.attr("href").trim()
-            if (url.isBlank()) null else {
-                val dn = extractQueryParam(url, "dn") ?: ""
-                Triple(a, url, dn)
+            val raw = a.attr("href").replace("&amp;", "&").trim()
+            if (raw.isBlank()) null else {
+                val dn = extractQueryParam(raw, "dn") ?: ""
+                Triple(a, raw, dn)
             }
         }
 
-        val individualMagnets = if (epPattern != null) {
-            allMagnets.filter { (_, _, dn) ->
-                !dn.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?""")) && epPattern.containsMatchIn(dn)
-            }
-        } else emptyList()
+        val torrentLinks = commentWrap.select("a[href*=attachment.php], a[href*=.torrent]")
 
-        val magnetsToProcess = if (individualMagnets.isNotEmpty()) {
-            individualMagnets
+        val magnetsToProcess = if (targetEp != null) {
+            val individual = allMagnets.filter { (_, _, dn) ->
+                !dn.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?""")) && (epPattern?.containsMatchIn(dn) == true)
+            }
+            if (individual.isNotEmpty()) {
+                individual
+            } else {
+                val batchMatching = allMagnets.filter { (_, _, dn) ->
+                    val rangeMatch = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(dn)
+                    if (rangeMatch != null) {
+                        val s = rangeMatch.groupValues[1].toIntOrNull() ?: 1
+                        val e = rangeMatch.groupValues[2].toIntOrNull() ?: s
+                        targetEp in s..e
+                    } else false
+                }
+                if (batchMatching.isNotEmpty()) batchMatching else allMagnets
+            }
         } else {
             allMagnets
         }
 
-        val isBatchEpisode = targetEp != null && individualMagnets.isEmpty()
-        val fileIndex = if (targetEp != null) maxOf(0, targetEp - startEp) else 0
-
         val torrentResults = mutableListOf<ExtractorLink>()
 
-        for ((_, magnetUrl, _) in magnetsToProcess) {
+        for ((_, magnetUrl, dn) in magnetsToProcess) {
             if (!seenUrls.add(magnetUrl)) continue
 
             val (linkName, quality) = parseMagnetMetadata(magnetUrl)
+            val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
 
-            if (isBatchEpisode) {
-                val indexedMagnetUrl = if (magnetUrl.contains("index=")) magnetUrl else "$magnetUrl&index=$fileIndex"
-                torrentResults.add(
-                    newExtractorLink(
-                        source = name,
-                        name = "$linkName [Ep $targetEp]",
-                        url = indexedMagnetUrl,
-                        type = ExtractorLinkType.MAGNET
-                    ) {
-                        this.referer = topicUrl
-                        this.quality = quality
-                    }
-                )
-            } else {
-                torrentResults.add(
-                    newExtractorLink(
-                        source = name,
-                        name = linkName,
-                        url = magnetUrl,
-                        type = ExtractorLinkType.MAGNET
-                    ) {
-                        this.referer = topicUrl
-                        this.quality = quality
-                    }
-                )
-            }
+            torrentResults.add(
+                newExtractorLink(
+                    source = name,
+                    name = displayName,
+                    url = magnetUrl,
+                    type = ExtractorLinkType.TORRENT
+                ) {
+                    this.referer = topicUrl
+                    this.quality = quality
+                }
+            )
         }
 
-        // If no magnets exist on the page, fallback to .torrent file attachments
-        if (allMagnets.isEmpty()) {
-            val torrentLinks = commentWrap.select("a[href*=attachment.php], a[href*=.torrent]")
-            for (a in torrentLinks) {
-                val rawHref = a.attr("href").trim()
-                if (rawHref.isBlank()) continue
-                val torrentUrl = fixUrl(rawHref)
-                if (!seenUrls.add(torrentUrl)) continue
-
-                val torrentText = a.text().trim()
-                val (linkName, quality) = parseTorrentMetadata(torrentText, torrentUrl)
-                val displayName = if (isBatchEpisode) "$linkName [Ep $targetEp]" else linkName
-
-                torrentResults.add(
-                    newExtractorLink(
-                        source = name,
-                        name = displayName,
-                        url = torrentUrl,
-                        type = ExtractorLinkType.TORRENT
-                    ) {
-                        this.referer = topicUrl
-                        this.quality = quality
-                    }
-                )
+        // Also process matching .torrent file attachments
+        val torrentsToProcess = if (targetEp != null) {
+            val individual = torrentLinks.filter { a ->
+                val text = a.text().trim()
+                !text.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?""")) && (epPattern?.containsMatchIn(text) == true)
             }
+            if (individual.isNotEmpty()) {
+                individual
+            } else {
+                val batchMatching = torrentLinks.filter { a ->
+                    val text = a.text().trim()
+                    val rangeMatch = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(text)
+                    if (rangeMatch != null) {
+                        val s = rangeMatch.groupValues[1].toIntOrNull() ?: 1
+                        val e = rangeMatch.groupValues[2].toIntOrNull() ?: s
+                        targetEp in s..e
+                    } else false
+                }
+                if (batchMatching.isNotEmpty()) batchMatching else torrentLinks
+            }
+        } else {
+            torrentLinks
+        }
+
+        for (a in torrentsToProcess) {
+            val rawHref = a.attr("href").trim()
+            if (rawHref.isBlank()) continue
+            val torrentUrl = fixUrl(rawHref)
+            if (!seenUrls.add(torrentUrl)) continue
+
+            val torrentText = a.text().trim()
+            val (linkName, quality) = parseTorrentMetadata(torrentText, torrentUrl)
+            val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
+
+            torrentResults.add(
+                newExtractorLink(
+                    source = name,
+                    name = displayName,
+                    url = torrentUrl,
+                    type = ExtractorLinkType.TORRENT
+                ) {
+                    this.referer = topicUrl
+                    this.quality = quality
+                }
+            )
         }
 
         // Sort torrent links descending by quality (4K -> 1080p -> 720p -> 480p)
@@ -906,7 +974,7 @@ class TamilMVProvider : MainAPI() {
     }
 
     private fun extractQueryParam(url: String, key: String): String? {
-        val query = url.substringAfter("?", "")
+        val query = url.replace("&amp;", "&").substringAfter("?", "")
         if (query.isBlank()) return null
         for (pair in query.split("&")) {
             val parts = pair.split("=", limit = 2)
