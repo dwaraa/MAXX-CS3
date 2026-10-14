@@ -6,6 +6,8 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import com.lagradost.cloudstream3.utils.loadExtractor
+import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import java.net.URLDecoder
@@ -680,7 +682,151 @@ class TamilMVProvider : MainAPI() {
             foundLinks = true
         }
 
+        // 3. Process Direct Links (Cyberloom / MessyCloud / JuicyBits direct video streaming)
+        val allATags = commentWrap.select("a")
+        val directElements = allATags.filter { a ->
+            val href = a.attr("href").trim()
+            val text = a.text().trim().uppercase()
+            (text.contains("DIRECT") || href.contains("cyberloom")) &&
+                    !href.startsWith("magnet:") &&
+                    !href.contains("attachment.php") &&
+                    !href.endsWith(".torrent")
+        }
+
+        val directCandidates = directElements.mapNotNull { d ->
+            val rawHref = d.attr("href").trim()
+            if (rawHref.isBlank()) return@mapNotNull null
+            val directUrl = fixUrl(rawHref)
+
+            // Find preceding metadata (torrent attachment or magnet) to determine file name & resolution
+            val dIdx = allATags.indexOf(d)
+            var nameCandidate = ""
+            for (i in (dIdx - 1) downTo 0) {
+                val prev = allATags[i]
+                val prevHref = prev.attr("href").trim()
+                val prevText = prev.text().trim()
+                if (prevHref.contains("attachment.php") || prevHref.endsWith(".torrent")) {
+                    nameCandidate = prevText.ifBlank { prevHref.substringAfterLast("/") }
+                    break
+                } else if (prevHref.startsWith("magnet:")) {
+                    val dn = extractQueryParam(prevHref, "dn")
+                    if (!dn.isNullOrBlank()) {
+                        nameCandidate = try {
+                            URLDecoder.decode(dn, "UTF-8")
+                        } catch (_: Exception) {
+                            dn
+                        }
+                        break
+                    }
+                }
+            }
+
+            // If in a TV series, filter by target episode if individual episode releases exist
+            if (epPattern != null && nameCandidate.isNotBlank()) {
+                val isRange = nameCandidate.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?"""))
+                if (!isRange && !epPattern.containsMatchIn(nameCandidate)) {
+                    return@mapNotNull null
+                }
+            }
+
+            directUrl to nameCandidate
+        }
+
+        if (directCandidates.isNotEmpty()) {
+            directCandidates.amap { (directUrl, nameCandidate) ->
+                if (!seenUrls.add(directUrl)) return@amap
+
+                val resolvedUrl = resolveDirectLink(directUrl)
+                if (!resolvedUrl.isNullOrBlank()) {
+                    val (linkName, quality) = formatLinkLabel(nameCandidate, null, prefix = "[Direct]")
+                    val displayName = if (isBatchEpisode) "$linkName [Ep $targetEp]" else linkName
+                    callback(
+                        newExtractorLink(
+                            source = name,
+                            name = displayName,
+                            url = resolvedUrl,
+                            type = ExtractorLinkType.VIDEO
+                        ) {
+                            this.referer = ""
+                            this.quality = quality
+                        }
+                    )
+                    foundLinks = true
+                } else {
+                    if (loadExtractor(directUrl, topicUrl, subtitleCallback, callback)) {
+                        foundLinks = true
+                    }
+                }
+            }
+        }
+
+        // 4. Process any other stream/online embed links (e.g., doodstream, streamtape, mixdrop)
+        val onlineLinks = commentWrap.select("a[href]").filter { a ->
+            val href = a.attr("href").trim()
+            val text = a.text().trim().uppercase()
+            (text.contains("STREAM") || text.contains("ONLINE") || text.contains("WATCH") || href.contains("/d/")) &&
+                    !href.startsWith("magnet:") &&
+                    !href.contains("attachment.php") &&
+                    !href.endsWith(".torrent") &&
+                    !href.contains("cyberloom") &&
+                    !seenUrls.contains(href)
+        }
+        for (a in onlineLinks) {
+            val href = fixUrl(a.attr("href").trim())
+            if (seenUrls.add(href)) {
+                if (loadExtractor(href, topicUrl, subtitleCallback, callback)) {
+                    foundLinks = true
+                }
+            }
+        }
+
         return foundLinks
+    }
+
+    private suspend fun resolveDirectLink(directUrl: String): String? {
+        return try {
+            val r1 = app.get(directUrl, headers = DEFAULT_HEADERS)
+            val stackmintHtml = if (r1.text.contains("id=\"cta\"") || r1.text.contains("out?t=")) {
+                r1.text
+            } else {
+                val loc = r1.headers["Location"]
+                if (!loc.isNullOrBlank()) {
+                    app.get(fixUrl(loc), headers = DEFAULT_HEADERS).text
+                } else {
+                    r1.text
+                }
+            }
+            val stackmintUrl = r1.url
+
+            val ctaUrl = r1.document.selectFirst("#cta, a.btn[href*=out?t=]")?.attr("href")
+                ?: Regex("""(?i)href=["'](https?://[^"']+/out\?t=[^"']+)["']""").find(stackmintHtml)?.groupValues?.get(1)
+                ?: return null
+
+            val headersWithRef = DEFAULT_HEADERS.toMutableMap().apply {
+                this["Referer"] = stackmintUrl
+            }
+            val r2 = app.get(ctaUrl, headers = headersWithRef)
+            val messyHtml = if (r2.text.contains("download-btn") || r2.text.contains("/files/")) {
+                r2.text
+            } else {
+                val loc2 = r2.headers["Location"]
+                if (!loc2.isNullOrBlank()) {
+                    app.get(fixUrl(loc2), headers = DEFAULT_HEADERS).text
+                } else {
+                    r2.text
+                }
+            }
+
+            val doc2 = Jsoup.parse(messyHtml)
+            val dlBtn = doc2.selectFirst("a.download-btn, a[href*='/files/'], a[href*='cdn.']")?.attr("href")
+            if (!dlBtn.isNullOrBlank()) return fixUrl(dlBtn)
+
+            val regexMatch = Regex("""(?i)https?://[^\s"'<>]+\.(?:mkv|mp4)[^\s"'<>]*""").find(messyHtml)
+            regexMatch?.value?.let { fixUrl(it) }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            null
+        }
     }
 
     private fun parseMagnetMetadata(magnetUrl: String): Pair<String, Int> {
@@ -733,12 +879,12 @@ class TamilMVProvider : MainAPI() {
         }
 
         val labelParts = mutableListOf<String>()
-        prefix?.let { labelParts.add(it) }
         labelParts.add(qualityLabel)
         labelParts.addAll(codecs)
         sizeStr?.let { labelParts.add(it) }
 
-        val finalLabel = "[1TamilMV] " + labelParts.joinToString(" • ")
+        val prefixStr = if (!prefix.isNullOrBlank()) "$prefix " else ""
+        val finalLabel = "[1TamilMV] $prefixStr" + labelParts.joinToString(" • ")
         return finalLabel to quality
     }
 
