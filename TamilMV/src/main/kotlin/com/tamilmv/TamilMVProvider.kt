@@ -679,7 +679,7 @@ class TamilMVProvider : MainAPI() {
                 val resolvedUrl = resolveDirectLink(directUrl)
                 if (!resolvedUrl.isNullOrBlank()) {
                     val (linkName, quality) = formatLinkLabel(nameCandidate, null, prefix = "Direct")
-                    val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
+                    val displayName = linkName
                     val directLink = newExtractorLink(
                         source = name,
                         name = displayName,
@@ -715,7 +715,20 @@ class TamilMVProvider : MainAPI() {
         val allMagnets = commentWrap.select("a[href^=magnet:]").mapNotNull { a ->
             val raw = a.attr("href").replace("&amp;", "&").trim()
             if (raw.isBlank()) null else {
-                val dn = extractQueryParam(raw, "dn") ?: ""
+                var dn = extractQueryParam(raw, "dn") ?: ""
+                if (dn.isBlank()) {
+                    val aIdx = allATags.indexOf(a)
+                    if (aIdx > 0) {
+                        for (i in (aIdx - 1) downTo 0) {
+                            val prev = allATags[i]
+                            val prevHref = prev.attr("href").trim()
+                            if (prevHref.contains("attachment.php") || prevHref.endsWith(".torrent")) {
+                                dn = prev.text().trim()
+                                break
+                            }
+                        }
+                    }
+                }
                 Triple(a, raw, dn)
             }
         }
@@ -737,7 +750,14 @@ class TamilMVProvider : MainAPI() {
                         targetEp in s..e
                     } else false
                 }
-                if (batchMatching.isNotEmpty()) batchMatching else allMagnets
+                if (batchMatching.isNotEmpty()) {
+                    batchMatching
+                } else {
+                    val anyHasRange = allMagnets.any { (_, _, dn) ->
+                        Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").containsMatchIn(dn)
+                    }
+                    if (anyHasRange) emptyList() else allMagnets
+                }
             }
         } else {
             allMagnets
@@ -782,7 +802,7 @@ class TamilMVProvider : MainAPI() {
                 }
 
                 val (linkName, quality) = parseMagnetMetadata(magnetUrl)
-                val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
+                val displayName = linkName
 
                 torrentResults.add(
                     newExtractorLink(
@@ -815,7 +835,14 @@ class TamilMVProvider : MainAPI() {
                             targetEp in s..e
                         } else false
                     }
-                    if (batchMatching.isNotEmpty()) batchMatching else torrentLinks
+                    if (batchMatching.isNotEmpty()) {
+                        batchMatching
+                    } else {
+                        val anyHasRange = torrentLinks.any { a ->
+                            Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").containsMatchIn(a.text())
+                        }
+                        if (anyHasRange) emptyList() else torrentLinks
+                    }
                 }
             } else {
                 torrentLinks
@@ -845,7 +872,7 @@ class TamilMVProvider : MainAPI() {
                 }
 
                 val (linkName, quality) = parseTorrentMetadata(torrentText, torrentUrl)
-                val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
+                val displayName = linkName
 
                 torrentResults.add(
                     newExtractorLink(
@@ -1031,7 +1058,11 @@ class TamilMVProvider : MainAPI() {
         for (pair in query.split("&")) {
             val parts = pair.split("=", limit = 2)
             if (parts.size == 2 && parts[0].equals(key, ignoreCase = true)) {
-                return parts[1]
+                return try {
+                    URLDecoder.decode(parts[1], "UTF-8")
+                } catch (_: Exception) {
+                    parts[1]
+                }
             }
         }
         return null
@@ -1069,7 +1100,9 @@ class TamilMVProvider : MainAPI() {
                 val sortedFiles = files.sorted()
                 val epPattern1 = Regex("""(?i)(?:^|[\s\.\-_\[\(]|S\d+)(?:EP|E)\s*0*${targetEp}(?:[\s\.\-_\]\)]|$)""")
                 val epPattern2 = Regex("""(?i)\b(?:Episode|Ep)\s*0*${targetEp}\b""")
-                val matchedIndex = sortedFiles.indexOfFirst { epPattern1.containsMatchIn(it) || epPattern2.containsMatchIn(it) }
+                val matchedIndex = sortedFiles.indexOfFirst {
+                    !it.contains("sample", ignoreCase = true) && (epPattern1.containsMatchIn(it) || epPattern2.containsMatchIn(it))
+                }.let { if (it != -1) it else sortedFiles.indexOfFirst { f -> epPattern1.containsMatchIn(f) || epPattern2.containsMatchIn(f) } }
                 if (matchedIndex != -1) {
                     return matchedIndex + 1
                 }
