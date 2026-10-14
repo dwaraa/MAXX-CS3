@@ -476,7 +476,7 @@ class TamilMVProvider : MainAPI() {
             val rawHref = a.attr("href").replace("&amp;", "&")
             val dn = extractQueryParam(rawHref, "dn") ?: ""
             if (!dn.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?"""))) {
-                val m = Regex("""(?i)\bEP\s*0*(\d+)\b""").find(dn)
+                val m = Regex("""(?i)(?:^|[\s\.\-_\[\(]|S\d+)(?:EP|E)\s*0*(\d+)\b""").find(dn)
                 if (m != null) {
                     m.groupValues[1].toIntOrNull()?.let { individualEps.add(it) }
                 }
@@ -485,7 +485,7 @@ class TamilMVProvider : MainAPI() {
         for (a in allTorrents) {
             val text = a.text().trim()
             if (!text.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?"""))) {
-                val m = Regex("""(?i)\bEP\s*0*(\d+)\b""").find(text)
+                val m = Regex("""(?i)(?:^|[\s\.\-_\[\(]|S\d+)(?:EP|E)\s*0*(\d+)\b""").find(text)
                 if (m != null) {
                     m.groupValues[1].toIntOrNull()?.let { individualEps.add(it) }
                 }
@@ -494,7 +494,7 @@ class TamilMVProvider : MainAPI() {
 
         if (individualEps.size > 1) {
             return individualEps.sorted().map { epNum ->
-                newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=1") {
+                newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=$epNum&endEp=$epNum") {
                     this.name = "Episode $epNum"
                     this.season = seasonNum
                     this.episode = epNum
@@ -613,7 +613,9 @@ class TamilMVProvider : MainAPI() {
         var foundLinks = false
         val seenUrls = mutableSetOf<String>()
 
-        val epPattern = if (targetEp != null) Regex("""(?i)\bEP\s*0*${targetEp}\b""") else null
+        val epPattern = if (targetEp != null) {
+            Regex("""(?i)(?:^|[\s\.\-_\[\(]|S\d+)(?:EP|E)\s*0*${targetEp}(?:[\s\.\-_\]\)]|$)""")
+        } else null
         val allATags = commentWrap.select("a")
 
         // 1. Process and resolve all DIRECT LINKS first
@@ -742,71 +744,121 @@ class TamilMVProvider : MainAPI() {
         }
 
         val torrentResults = mutableListOf<ExtractorLink>()
+        val torrentFilesCache = mutableMapOf<String, List<String>>()
 
-        for ((_, magnetUrl, dn) in magnetsToProcess) {
-            if (!seenUrls.add(magnetUrl)) continue
+        // If magnets exist, ONLY emit magnet links (avoids duplicate sources and unauthenticated .torrent attachment errors)
+        if (magnetsToProcess.isNotEmpty()) {
+            for ((aTag, magnetUrl, dn) in magnetsToProcess) {
+                if (!seenUrls.add(magnetUrl)) continue
 
-            val (linkName, quality) = parseMagnetMetadata(magnetUrl)
-            val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
-
-            torrentResults.add(
-                newExtractorLink(
-                    source = name,
-                    name = displayName,
-                    url = magnetUrl,
-                    type = ExtractorLinkType.TORRENT
-                ) {
-                    this.referer = topicUrl
-                    this.quality = quality
+                // Find corresponding .torrent attachment in DOM for authoritative file indexing
+                val aIdx = allATags.indexOf(aTag)
+                var matchingAttachmentUrl: String? = null
+                if (aIdx > 0) {
+                    for (i in (aIdx - 1) downTo 0) {
+                        val prev = allATags[i]
+                        val prevHref = prev.attr("href").trim()
+                        if (prevHref.contains("attachment.php") || prevHref.endsWith(".torrent")) {
+                            matchingAttachmentUrl = fixUrl(prevHref)
+                            break
+                        }
+                    }
                 }
-            )
-        }
 
-        // Also process matching .torrent file attachments
-        val torrentsToProcess = if (targetEp != null) {
-            val individual = torrentLinks.filter { a ->
-                val text = a.text().trim()
-                !text.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?""")) && (epPattern?.containsMatchIn(text) == true)
-            }
-            if (individual.isNotEmpty()) {
-                individual
-            } else {
-                val batchMatching = torrentLinks.filter { a ->
-                    val text = a.text().trim()
-                    val rangeMatch = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(text)
-                    if (rangeMatch != null) {
-                        val s = rangeMatch.groupValues[1].toIntOrNull() ?: 1
-                        val e = rangeMatch.groupValues[2].toIntOrNull() ?: s
-                        targetEp in s..e
-                    } else false
+                val fileIndex = resolveEpisodeFileIndex(
+                    attachmentUrl = matchingAttachmentUrl,
+                    topicUrl = topicUrl,
+                    dn = dn,
+                    targetEp = targetEp,
+                    fallbackStartEp = startEp,
+                    fallbackEndEp = endEp,
+                    torrentFilesCache = torrentFilesCache
+                )
+
+                val finalMagnetUrl = if (fileIndex != null && fileIndex > 0) {
+                    if (magnetUrl.contains("?")) "$magnetUrl&index=$fileIndex" else "$magnetUrl?index=$fileIndex"
+                } else {
+                    magnetUrl
                 }
-                if (batchMatching.isNotEmpty()) batchMatching else torrentLinks
+
+                val (linkName, quality) = parseMagnetMetadata(magnetUrl)
+                val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
+
+                torrentResults.add(
+                    newExtractorLink(
+                        source = name,
+                        name = displayName,
+                        url = finalMagnetUrl,
+                        type = ExtractorLinkType.TORRENT
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
             }
         } else {
-            torrentLinks
-        }
-
-        for (a in torrentsToProcess) {
-            val rawHref = a.attr("href").trim()
-            if (rawHref.isBlank()) continue
-            val torrentUrl = fixUrl(rawHref)
-            if (!seenUrls.add(torrentUrl)) continue
-
-            val torrentText = a.text().trim()
-            val (linkName, quality) = parseTorrentMetadata(torrentText, torrentUrl)
-            val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
-
-            torrentResults.add(
-                newExtractorLink(
-                    source = name,
-                    name = displayName,
-                    url = torrentUrl,
-                    type = ExtractorLinkType.TORRENT
-                ) {
-                    this.referer = topicUrl
-                    this.quality = quality
+            // Fallback: If NO magnets are found on the page, process matching .torrent file attachments
+            val torrentsToProcess = if (targetEp != null) {
+                val individual = torrentLinks.filter { a ->
+                    val text = a.text().trim()
+                    !text.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?""")) && (epPattern?.containsMatchIn(text) == true)
                 }
-            )
+                if (individual.isNotEmpty()) {
+                    individual
+                } else {
+                    val batchMatching = torrentLinks.filter { a ->
+                        val text = a.text().trim()
+                        val rangeMatch = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(text)
+                        if (rangeMatch != null) {
+                            val s = rangeMatch.groupValues[1].toIntOrNull() ?: 1
+                            val e = rangeMatch.groupValues[2].toIntOrNull() ?: s
+                            targetEp in s..e
+                        } else false
+                    }
+                    if (batchMatching.isNotEmpty()) batchMatching else torrentLinks
+                }
+            } else {
+                torrentLinks
+            }
+
+            for (a in torrentsToProcess) {
+                val rawHref = a.attr("href").trim()
+                if (rawHref.isBlank()) continue
+                val torrentUrl = fixUrl(rawHref)
+                if (!seenUrls.add(torrentUrl)) continue
+
+                val torrentText = a.text().trim()
+                val fileIndex = resolveEpisodeFileIndex(
+                    attachmentUrl = torrentUrl,
+                    topicUrl = topicUrl,
+                    dn = torrentText,
+                    targetEp = targetEp,
+                    fallbackStartEp = startEp,
+                    fallbackEndEp = endEp,
+                    torrentFilesCache = torrentFilesCache
+                )
+
+                val finalTorrentUrl = if (fileIndex != null && fileIndex > 0) {
+                    if (torrentUrl.contains("?")) "$torrentUrl&index=$fileIndex" else "$torrentUrl?index=$fileIndex"
+                } else {
+                    torrentUrl
+                }
+
+                val (linkName, quality) = parseTorrentMetadata(torrentText, torrentUrl)
+                val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
+
+                torrentResults.add(
+                    newExtractorLink(
+                        source = name,
+                        name = displayName,
+                        url = finalTorrentUrl,
+                        type = ExtractorLinkType.TORRENT
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
+            }
         }
 
         // Sort torrent links descending by quality (4K -> 1080p -> 720p -> 480p)
@@ -983,5 +1035,151 @@ class TamilMVProvider : MainAPI() {
             }
         }
         return null
+    }
+
+    private suspend fun resolveEpisodeFileIndex(
+        attachmentUrl: String?,
+        topicUrl: String,
+        dn: String,
+        targetEp: Int?,
+        fallbackStartEp: Int,
+        fallbackEndEp: Int,
+        torrentFilesCache: MutableMap<String, List<String>>
+    ): Int? {
+        if (targetEp == null) return null
+
+        // 1. Try to download and parse the .torrent file to find the authoritative file index
+        if (!attachmentUrl.isNullOrBlank()) {
+            val files = torrentFilesCache.getOrPut(attachmentUrl) {
+                try {
+                    val headers = DEFAULT_HEADERS.toMutableMap().apply {
+                        this["Referer"] = topicUrl
+                    }
+                    val res = app.get(attachmentUrl, headers = headers)
+                    if (res.code in 200..299 && res.body.bytes().isNotEmpty()) {
+                        parseTorrentFiles(res.body.bytes())
+                    } else emptyList()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+            }
+
+            if (files.isNotEmpty()) {
+                // TorrServer sorts all files alphabetically by path and assigns 1-based Id
+                val sortedFiles = files.sorted()
+                val epPattern1 = Regex("""(?i)(?:^|[\s\.\-_\[\(]|S\d+)(?:EP|E)\s*0*${targetEp}(?:[\s\.\-_\]\)]|$)""")
+                val epPattern2 = Regex("""(?i)\b(?:Episode|Ep)\s*0*${targetEp}\b""")
+                val matchedIndex = sortedFiles.indexOfFirst { epPattern1.containsMatchIn(it) || epPattern2.containsMatchIn(it) }
+                if (matchedIndex != -1) {
+                    return matchedIndex + 1
+                }
+            }
+        }
+
+        // 2. Fallback: calculate 1-based index from batch range
+        val rangeMatch = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(dn)
+        val batchStart = rangeMatch?.groupValues?.get(1)?.toIntOrNull() ?: fallbackStartEp
+        val batchEnd = rangeMatch?.groupValues?.get(2)?.toIntOrNull() ?: fallbackEndEp
+
+        return if (targetEp in batchStart..batchEnd) {
+            (targetEp - batchStart + 1).coerceAtLeast(1)
+        } else {
+            1
+        }
+    }
+
+    private fun parseTorrentFiles(bytes: ByteArray): List<String> {
+        val needle = "4:infod".toByteArray(Charsets.US_ASCII)
+        val infoIndex = indexOfBytes(bytes, needle, 0)
+        if (infoIndex == -1) return emptyList()
+
+        var idx = infoIndex + needle.size - 1
+        fun decode(): Any? {
+            if (idx >= bytes.size) return null
+            val b = bytes[idx]
+            return when (b.toInt().toChar()) {
+                'i' -> {
+                    val end = indexOfByte(bytes, 'e'.code.toByte(), idx)
+                    if (end == -1) return null
+                    val num = String(bytes, idx + 1, end - (idx + 1), Charsets.US_ASCII).toLongOrNull()
+                    idx = end + 1
+                    num
+                }
+                'l' -> {
+                    val list = mutableListOf<Any?>()
+                    idx++
+                    while (idx < bytes.size && bytes[idx].toInt().toChar() != 'e') {
+                        decode()?.let { list.add(it) }
+                    }
+                    if (idx < bytes.size && bytes[idx].toInt().toChar() == 'e') idx++
+                    list
+                }
+                'd' -> {
+                    val map = mutableMapOf<String, Any?>()
+                    idx++
+                    while (idx < bytes.size && bytes[idx].toInt().toChar() != 'e') {
+                        val key = decode() as? String
+                        if (key == null) {
+                            decode()
+                            continue
+                        }
+                        val value = decode()
+                        map[key] = value
+                    }
+                    if (idx < bytes.size && bytes[idx].toInt().toChar() == 'e') idx++
+                    map
+                }
+                in '0'..'9' -> {
+                    val colon = indexOfByte(bytes, ':'.code.toByte(), idx)
+                    if (colon == -1) return null
+                    val len = String(bytes, idx, colon - idx, Charsets.US_ASCII).toIntOrNull() ?: return null
+                    val start = colon + 1
+                    idx = start + len
+                    if (idx <= bytes.size) {
+                        if (len > 5000) {
+                            null // skip large binary blobs like pieces SHA1 hashes
+                        } else {
+                            String(bytes, start, len, Charsets.UTF_8)
+                        }
+                    } else null
+                }
+                else -> null
+            }
+        }
+
+        val info = decode() as? Map<*, *> ?: return emptyList()
+        val files = info["files"] as? List<*>
+        if (files != null) {
+            val result = mutableListOf<String>()
+            for (f in files) {
+                if (f is Map<*, *>) {
+                    val pathList = f["path"] as? List<*>
+                    if (pathList != null) {
+                        result.add(pathList.filterIsInstance<String>().joinToString("/"))
+                    }
+                }
+            }
+            return result
+        }
+        val singleName = info["name"] as? String
+        return if (singleName != null) listOf(singleName) else emptyList()
+    }
+
+    private fun indexOfBytes(haystack: ByteArray, needle: ByteArray, start: Int): Int {
+        if (needle.isEmpty()) return 0
+        outer@ for (i in start..haystack.size - needle.size) {
+            for (j in needle.indices) {
+                if (haystack[i + j] != needle[j]) continue@outer
+            }
+            return i
+        }
+        return -1
+    }
+
+    private fun indexOfByte(bytes: ByteArray, target: Byte, start: Int): Int {
+        for (i in start until bytes.size) {
+            if (bytes[i] == target) return i
+        }
+        return -1
     }
 }
