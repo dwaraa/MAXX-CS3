@@ -18,6 +18,7 @@ poster-workers/
 *.ps1
 *.md
 *.py
+!.github/scripts/*.py
 *.txt
 *.html
 *.iml
