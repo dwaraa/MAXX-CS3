@@ -23,3 +23,6 @@ poster-workers/
 *.iml
 *.png
 !TamilMV/icon.png
+!TamilDhool/icon.png
+!Einthusan/icon.png
+!TamilUltra/icon.png
