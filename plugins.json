@@ -67,10 +67,10 @@
     },
     {
         "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/TamilMV/icon.png",
-        "fileHash": "sha256-bdba478b79bf20a785abc12d66cd787bd8273c4a0a7b4b281f1faf83653b5617",
+        "fileHash": "sha256-99d5f84d0dda6e8019cd2d070a1745deccf4bf7501a918ed7822503f2300a1a9",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
-        "fileSize": 61449,
+        "fileSize": 63804,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -82,7 +82,7 @@
             "TvSeries",
             "Torrent"
         ],
-        "version": 1,
+        "version": 2,
         "internalName": "TamilMV",
         "description": "Watch & stream Tamil, Telugu, Hindi, Malayalam, Kannada & English movies and web series from 1TamilMV with Torrent & Magnet streaming",
         "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/TamilMV.cs3",
