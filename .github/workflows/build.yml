@@ -34,9 +34,9 @@ jobs:
           chmod +x gradlew
           ./gradlew make makePluginsJson
           mkdir -p dist
-          cp */build/*.cs3 dist/ || cp **/build/*.cs3 dist/ || true
-          cp build/plugins.json dist/ || true
-          cp repo.json dist/ || true
+          find . -name "*.cs3" -path "*/build/*" -exec cp {} dist/ \; || true
+          [ -f build/plugins.json ] && cp build/plugins.json dist/ || true
+          [ -f repo.json ] && cp repo.json dist/ || true
 
       - name: Deploy to builds branch
         uses: s0/git-publish-subdir-action@develop
