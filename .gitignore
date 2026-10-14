@@ -9,7 +9,7 @@
 MAIN-RESLOVER/
 builds/
 build/
-TamilUltra/build/
+**/build/
 poster-workers/
 .cxx
 *.apk
