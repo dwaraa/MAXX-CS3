@@ -38,6 +38,19 @@ A high-performance **CloudStream 3** plugin repository featuring **SpecialityStr
   - **VidSrc Ecosystem**: Dynamic mirror resolution across `vidsrc.net`, `vidsrc.pm`, `vidsrc.cc`, `vidsrc.xyz`, `vidsrc.vip`.
   - **Multi-Embed Fallbacks**: `2Embed`, `AutoEmbed`, `MultiEmbed`, `SmashyStream`, `MoviesAPI`.
 
+### ⚡ 1TamilMV Provider (1tamilmv.fi)
+- **🧲 Direct Torrent & Magnet Streaming**: Complete extraction of all available magnet links and torrent attachments directly compatible with CloudStream's built-in torrent engine.
+- **🎬 Comprehensive Regional & Global Catalog**:
+  - **Tamil**: WEB-HD / BluRay, Web Series & TV Shows, PreDVD / DVDScr, and HD-Rips.
+  - **Telugu**: WEB-HD / BluRay, Web Series, and PreDVD.
+  - **Hindi**: WEB-HD / BluRay, Web Series, and PreDVD.
+  - **Malayalam & Kannada**: WEB-HD / BluRay releases and Web Series.
+  - **English & Hollywood**: Hollywood multi-audio movies and Web Series.
+- **🔄 Dynamic Mirror & Domain Tracking**: Automatically follows 301/302 redirects from `1tamilmv.fi` to active domain mirrors (`.capital`, etc.).
+- **✨ TMDB Rich Metadata Integration**: Automatic title & release parsing with TMDB matching for 4K theatrical backdrops, title logos, official synopsis, cast, and trailers.
+- **📊 Precise Quality & Size Parsing**: Clearly labels each stream option with quality badge (4K, 1080p, 720p, 480p), video codec (HEVC/x265, AVC/x264), audio channels (DD+ 5.1, AAC), and file size.
+- **🔍 Fast Invision Forum Search**: Full topic search across releases with automatic pagination.
+
 ---
 
 ## 📁 Project Structure
