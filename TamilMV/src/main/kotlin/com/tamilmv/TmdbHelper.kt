@@ -59,9 +59,9 @@ object TmdbHelper {
     var posterWorkerUrl: String = "https://posters.devs-10f.workers.dev"
 
     fun getPosterWithLanguage(posterUrl: String?, language: String?): String? {
-        val langName = language?.trim()?.replaceFirstChar { it.uppercase() }?.takeIf { it.isNotBlank() } ?: "Tamil"
+        val langName = language?.trim()?.takeIf { it.isNotBlank() } ?: "Tamil"
+        val encodedLang = URLEncoder.encode(langName, "UTF-8")
         val targetWorkerUrl = if (posterUrl.isNullOrBlank()) {
-            val encodedLang = URLEncoder.encode(langName, "UTF-8")
             "$posterWorkerUrl/?text=$encodedLang&w=500&h=750&v=2"
         } else {
             val cleanUrl = if (posterUrl.startsWith("http")) {
@@ -70,8 +70,7 @@ object TmdbHelper {
                 "https://image.tmdb.org/t/p/w500/${posterUrl.removePrefix("/")}"
             }
             val encodedTmdb = URLEncoder.encode(cleanUrl, "UTF-8")
-            val encodedLang = URLEncoder.encode(langName, "UTF-8")
-            "$posterWorkerUrl/?tmdb=$encodedTmdb&lang=$encodedLang&v=2"
+            "$posterWorkerUrl/?tmdb=$encodedTmdb&lang=$encodedLang&text=$encodedLang&v=2"
         }
 
         return try {

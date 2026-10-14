@@ -211,16 +211,90 @@ class TamilMVProvider : MainAPI() {
                 !lower.contains("members lounge")
     }
 
-    private fun detectLanguage(text: String, defaultCategory: String? = null): String {
-        val lower = "$text ${defaultCategory ?: ""}".lowercase()
+    private fun parseQuality(rawTitle: String): SearchQuality {
+        val upper = rawTitle.uppercase()
         return when {
-            lower.contains("telugu") -> "Telugu"
-            lower.contains("hindi") -> "Hindi"
-            lower.contains("malayalam") -> "Malayalam"
-            lower.contains("kannada") -> "Kannada"
-            lower.contains("english") || lower.contains("hollywood") -> "English"
+            upper.contains("4K") || upper.contains("2160P") || upper.contains("UHD") -> SearchQuality.FourK
+            upper.contains("BLURAY") || upper.contains("BR-RIP") || upper.contains("BRRIP") -> SearchQuality.BlueRay
+            upper.contains("HDR") -> SearchQuality.HDR
+            upper.contains("1080P") || upper.contains("WEB-DL") || upper.contains("WEBDL") -> SearchQuality.HD
+            upper.contains("720P") || upper.contains("HDRIP") -> SearchQuality.HD
+            upper.contains("PREDVD") || upper.contains("DVDSCR") || upper.contains("HQ") -> SearchQuality.HQ
+            upper.contains("CAM") || upper.contains("TC") -> SearchQuality.Cam
+            upper.contains("DVD") -> SearchQuality.DVD
+            upper.contains("480P") -> SearchQuality.SD
+            else -> SearchQuality.HD
+        }
+    }
+
+    private fun extractLanguages(rawTitle: String, defaultCategory: String? = null): String {
+        val bracketMatch = Regex("""\[\s*([A-Za-z\s\+\,\/]+(?:Tam|Tel|Hin|Mal|Kan|Eng|Tamil|Telugu|Hindi|Malayalam|Kannada|English)[A-Za-z\s\+\,\/]*)\s*\]""", RegexOption.IGNORE_CASE).find(rawTitle)
+        if (bracketMatch != null) {
+            val group = bracketMatch.groupValues[1]
+            val tokens = group.split(Regex("""[\+\,\/]""")).map { it.trim() }.filter { it.isNotBlank() }
+            val found = mutableListOf<String>()
+            for (token in tokens) {
+                val lower = token.lowercase()
+                when {
+                    lower.contains("tam") -> if (!found.contains("Tamil")) found.add("Tamil")
+                    lower.contains("tel") -> if (!found.contains("Telugu")) found.add("Telugu")
+                    lower.contains("hin") -> if (!found.contains("Hindi")) found.add("Hindi")
+                    lower.contains("mal") -> if (!found.contains("Malayalam")) found.add("Malayalam")
+                    lower.contains("kan") -> if (!found.contains("Kannada")) found.add("Kannada")
+                    lower.contains("eng") -> if (!found.contains("English")) found.add("English")
+                }
+            }
+            if (found.isNotEmpty()) {
+                return formatLanguageList(found)
+            }
+        }
+
+        val found = mutableListOf<String>()
+        val lower = rawTitle.lowercase()
+        if (Regex("""\b(tam|tamil)\b""").containsMatchIn(lower)) found.add("Tamil")
+        if (Regex("""\b(tel|telugu)\b""").containsMatchIn(lower)) found.add("Telugu")
+        if (Regex("""\b(hin|hindi)\b""").containsMatchIn(lower)) found.add("Hindi")
+        if (Regex("""\b(mal|malayalam)\b""").containsMatchIn(lower)) found.add("Malayalam")
+        if (Regex("""\b(kan|kannada)\b""").containsMatchIn(lower)) found.add("Kannada")
+        if (Regex("""\b(eng|english|hollywood)\b""").containsMatchIn(lower)) found.add("English")
+
+        if (found.isNotEmpty()) {
+            return formatLanguageList(found)
+        }
+
+        val catLower = (defaultCategory ?: "").lowercase()
+        return when {
+            catLower.contains("telugu") -> "Telugu"
+            catLower.contains("hindi") -> "Hindi"
+            catLower.contains("malayalam") -> "Malayalam"
+            catLower.contains("kannada") -> "Kannada"
+            catLower.contains("english") -> "English"
             else -> "Tamil"
         }
+    }
+
+    private fun formatLanguageList(langs: List<String>): String {
+        if (langs.isEmpty()) return "Tamil"
+        if (langs.size == 1) return langs[0]
+
+        val fullJoined = langs.joinToString(" + ")
+        if (fullJoined.length <= 25) return fullJoined
+
+        val shortMap = mapOf(
+            "Tamil" to "Tam",
+            "Telugu" to "Tel",
+            "Hindi" to "Hin",
+            "Malayalam" to "Mal",
+            "Kannada" to "Kan",
+            "English" to "Eng"
+        )
+        val shortJoined = langs.map { shortMap[it] ?: it }.joinToString(" + ")
+        return if (shortJoined.length <= 35) shortJoined else "Multi Audio"
+    }
+
+    private fun getPrimaryIsoLang(languages: String): String {
+        val first = languages.split("+").firstOrNull()?.trim() ?: languages
+        return TmdbHelper.toIso6391(first)
     }
 
     private fun parseTitleAndYear(rawTitle: String): Pair<String, Int?> {
@@ -254,9 +328,10 @@ class TamilMVProvider : MainAPI() {
         val (cleanTitle, year) = parseTitleAndYear(rawTitle)
         if (cleanTitle.isBlank()) return null
 
-        val language = detectLanguage(rawTitle, defaultCategory)
-        val isoLang = TmdbHelper.toIso6391(language)
+        val languages = extractLanguages(rawTitle, defaultCategory)
+        val isoLang = getPrimaryIsoLang(languages)
         val isTv = isTvSeries(rawTitle, href)
+        val quality = parseQuality(rawTitle)
 
         val tmdb = try {
             TmdbHelper.getMetadata(cleanTitle, year, isoLang, isTv)
@@ -267,17 +342,19 @@ class TamilMVProvider : MainAPI() {
         val displayTitle = tmdb?.getResolvedTitle() ?: cleanTitle
         val resolvedYear = tmdb?.getYear() ?: year
         val posterCandidate = tmdb?.getPosterUrl(isoLang)
-        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, language)
+        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, languages)
 
         return if (isTv) {
             newTvSeriesSearchResponse(displayTitle, href, TvType.TvSeries) {
                 this.posterUrl = finalPoster
                 this.year = resolvedYear
+                this.quality = quality
             }
         } else {
             newMovieSearchResponse(displayTitle, href, TvType.Movie) {
                 this.posterUrl = finalPoster
                 this.year = resolvedYear
+                this.quality = quality
             }
         }
     }
@@ -290,8 +367,8 @@ class TamilMVProvider : MainAPI() {
         val pageTitle = doc.selectFirst("h1.ipsType_pageTitle, h1")?.text()?.trim() ?: doc.title()
         val (cleanTitle, parsedYear) = parseTitleAndYear(pageTitle)
 
-        val language = detectLanguage(pageTitle)
-        val isoLang = TmdbHelper.toIso6391(language)
+        val languages = extractLanguages(pageTitle)
+        val isoLang = getPrimaryIsoLang(languages)
         val isTv = isTvSeries(pageTitle, url)
 
         val commentWrap = doc.selectFirst("div[data-role=commentContent], div.cPost_contentWrap")
@@ -316,21 +393,21 @@ class TamilMVProvider : MainAPI() {
         }
 
         val baseTitle = tmdb?.getResolvedTitle() ?: cleanTitle
-        val finalTitle = if (baseTitle.contains(language, ignoreCase = true)) {
+        val finalTitle = if (baseTitle.contains(languages, ignoreCase = true)) {
             baseTitle
         } else {
-            "$baseTitle ($language)"
+            "$baseTitle ($languages)"
         }
 
         val posterCandidate = tmdb?.getPosterUrl(isoLang) ?: scrapedPoster
-        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, language)
+        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, languages)
         val finalBackdrop = tmdb?.getBackdropUrl() ?: scrapedPoster
         val finalLogo = tmdb?.getLogoUrl(isoLang)
         val basePlot = tmdb?.overview?.ifBlank { null }
         val finalYear = tmdb?.getYear() ?: parsedYear
 
         val finalPlot = buildString {
-            append("Language: $language • Year: ${finalYear ?: "N/A"}")
+            append("Language: $languages • Year: ${finalYear ?: "N/A"}")
             if (!basePlot.isNullOrBlank()) {
                 append("\n\n")
                 append(basePlot)
@@ -352,7 +429,7 @@ class TamilMVProvider : MainAPI() {
         }
 
         if (isTv) {
-            val episodes = parseEpisodes(pageTitle, url, finalPoster)
+            val episodes = parseEpisodes(pageTitle, url, finalPoster, commentWrap)
             return newTvSeriesLoadResponse(finalTitle, url, TvType.TvSeries, episodes) {
                 this.posterUrl = finalPoster
                 this.backgroundPosterUrl = finalBackdrop
@@ -390,18 +467,45 @@ class TamilMVProvider : MainAPI() {
         }
     }
 
-    private fun parseEpisodes(pageTitle: String, topicUrl: String, poster: String?): List<Episode> {
+    private fun parseEpisodes(pageTitle: String, topicUrl: String, poster: String?, commentWrap: Element?): List<Episode> {
         val seasonMatch = Regex("""(?i)\bS(\d{1,2})\b""").find(pageTitle)
         val seasonNum = seasonMatch?.groupValues?.get(1)?.toIntOrNull() ?: 1
 
-        // Check for range like EP (01-04) or EP(01-10)
+        // 1. Check if the post contains individual episode magnets (e.g. EP01, EP02...)
+        val discoveredEps = mutableSetOf<Int>()
+        if (commentWrap != null) {
+            for (a in commentWrap.select("a[href^=magnet:]")) {
+                val dn = extractQueryParam(a.attr("href"), "dn") ?: ""
+                if (!dn.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?"""))) {
+                    val m = Regex("""(?i)\bEP\s*0*(\d+)\b""").find(dn)
+                    if (m != null) {
+                        m.groupValues[1].toIntOrNull()?.let { discoveredEps.add(it) }
+                    }
+                }
+            }
+        }
+
+        if (discoveredEps.size > 1) {
+            return discoveredEps.sorted().map { epNum ->
+                newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=1") {
+                    this.name = "Episode $epNum"
+                    this.season = seasonNum
+                    this.episode = epNum
+                    this.posterUrl = poster
+                }
+            }
+        }
+
+        // 2. Check for range in title or text like EP (01-06) or EP(01-10)
         val rangeMatch = Regex("""(?i)\bEP\s*\(?(\d+)\s*[-–]\s*(\d+)\)?""").find(pageTitle)
+            ?: commentWrap?.let { Regex("""(?i)\bEP\s*\(?(\d+)\s*[-–]\s*(\d+)\)?""").find(it.text()) }
+
         if (rangeMatch != null) {
             val start = rangeMatch.groupValues[1].toIntOrNull() ?: 1
             val end = rangeMatch.groupValues[2].toIntOrNull() ?: start
             if (end >= start && end - start < 100) {
                 return (start..end).map { epNum ->
-                    newEpisode(topicUrl) {
+                    newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=$start") {
                         this.name = "Episode $epNum"
                         this.season = seasonNum
                         this.episode = epNum
@@ -411,12 +515,12 @@ class TamilMVProvider : MainAPI() {
             }
         }
 
-        // Check for single episode like EP05 or EP 38
-        val singleMatch = Regex("""(?i)\bEP\s*\(?(\d+)\)?""").find(pageTitle)
+        // 3. Check for single episode like EP05 or EP 38
+        val singleMatch = Regex("""(?i)\bEP\s*0*(\d+)\b""").find(pageTitle)
         if (singleMatch != null) {
             val epNum = singleMatch.groupValues[1].toIntOrNull() ?: 1
             return listOf(
-                newEpisode(topicUrl) {
+                newEpisode("$topicUrl#ep=$epNum&season=$seasonNum&startEp=$epNum") {
                     this.name = "Episode $epNum"
                     this.season = seasonNum
                     this.episode = epNum
@@ -425,9 +529,9 @@ class TamilMVProvider : MainAPI() {
             )
         }
 
-        // Default single episode for the whole batch
+        // 4. Default single episode for the whole batch
         return listOf(
-            newEpisode(topicUrl) {
+            newEpisode("$topicUrl#ep=1&season=$seasonNum&startEp=1") {
                 this.name = "Full Season / Release"
                 this.season = seasonNum
                 this.episode = 1
@@ -443,6 +547,15 @@ class TamilMVProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         val topicUrl = data.substringBefore("#")
+        val fragment = data.substringAfter("#", "")
+        val params = fragment.split("&").mapNotNull {
+            val p = it.split("=", limit = 2)
+            if (p.size == 2) p[0] to p[1] else null
+        }.toMap()
+
+        val targetEp = params["ep"]?.toIntOrNull()
+        val startEp = params["startEp"]?.toIntOrNull() ?: 1
+
         val res = try {
             app.get(topicUrl, headers = DEFAULT_HEADERS)
         } catch (_: Exception) {
@@ -457,23 +570,73 @@ class TamilMVProvider : MainAPI() {
         val seenUrls = mutableSetOf<String>()
 
         // 1. Process all Magnet links
-        val magnetLinks = commentWrap.select("a[href^=magnet:]")
-        for (a in magnetLinks) {
-            val magnetUrl = a.attr("href").trim()
-            if (magnetUrl.isBlank() || !seenUrls.add(magnetUrl)) continue
+        val allMagnets = commentWrap.select("a[href^=magnet:]").mapNotNull { a ->
+            val url = a.attr("href").trim()
+            if (url.isBlank()) null else {
+                val dn = extractQueryParam(url, "dn") ?: ""
+                Triple(a, url, dn)
+            }
+        }
+
+        val epPattern = if (targetEp != null) Regex("""(?i)\bEP\s*0*${targetEp}\b""") else null
+        val individualMagnets = if (epPattern != null) {
+            allMagnets.filter { (_, _, dn) ->
+                !dn.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?""")) && epPattern.containsMatchIn(dn)
+            }
+        } else emptyList()
+
+        val magnetsToProcess = if (individualMagnets.isNotEmpty()) {
+            individualMagnets
+        } else {
+            allMagnets
+        }
+
+        val isBatchEpisode = targetEp != null && individualMagnets.isEmpty()
+        val fileIndex = if (targetEp != null) maxOf(0, targetEp - startEp) else 0
+
+        for ((_, magnetUrl, _) in magnetsToProcess) {
+            if (!seenUrls.add(magnetUrl)) continue
 
             val (linkName, quality) = parseMagnetMetadata(magnetUrl)
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = linkName,
-                    url = magnetUrl,
-                    type = ExtractorLinkType.MAGNET
-                ) {
-                    this.referer = topicUrl
-                    this.quality = quality
-                }
-            )
+
+            if (isBatchEpisode) {
+                val indexedMagnetUrl = if (magnetUrl.contains("index=")) magnetUrl else "$magnetUrl&index=$fileIndex"
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = "$linkName [Ep $targetEp]",
+                        url = indexedMagnetUrl,
+                        type = ExtractorLinkType.MAGNET
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
+
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = "$linkName (Full Pack)",
+                        url = magnetUrl,
+                        type = ExtractorLinkType.MAGNET
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
+            } else {
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = linkName,
+                        url = magnetUrl,
+                        type = ExtractorLinkType.MAGNET
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
+            }
             foundLinks = true
         }
 
@@ -487,17 +650,33 @@ class TamilMVProvider : MainAPI() {
 
             val torrentText = a.text().trim()
             val (linkName, quality) = parseTorrentMetadata(torrentText, torrentUrl)
-            callback(
-                newExtractorLink(
-                    source = name,
-                    name = linkName,
-                    url = torrentUrl,
-                    type = ExtractorLinkType.TORRENT
-                ) {
-                    this.referer = topicUrl
-                    this.quality = quality
-                }
-            )
+
+            if (isBatchEpisode) {
+                val indexedTorrentUrl = if (torrentUrl.contains("index=")) torrentUrl else "$torrentUrl#index=$fileIndex"
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = "$linkName [Ep $targetEp]",
+                        url = indexedTorrentUrl,
+                        type = ExtractorLinkType.TORRENT
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
+            } else {
+                callback(
+                    newExtractorLink(
+                        source = name,
+                        name = linkName,
+                        url = torrentUrl,
+                        type = ExtractorLinkType.TORRENT
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
+            }
             foundLinks = true
         }
 
