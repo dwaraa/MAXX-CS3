@@ -66,6 +66,29 @@
         "name": "TamilDhool"
     },
     {
+        "iconUrl": "https://www.1tamilmv.capital/uploads/monthly_2020_09/58db8495c66f9_TMVICO.ico.6cbc0c2d9c2e07ae4018a3bb4975bb3e.ico.a8dc71fe3bd3607555703e6f02d85c99.ico",
+        "fileHash": "sha256-019f7a9546137105d6f2d4ff0ec4fc230dd514bf10acb43f7cbfcfe307694e56",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
+        "fileSize": 48036,
+        "status": 1,
+        "language": "ta",
+        "authors": [
+            "dwaraa",
+            "Cloudstream Community"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Torrent"
+        ],
+        "version": 1,
+        "internalName": "TamilMV",
+        "description": "Watch & stream Tamil, Telugu, Hindi, Malayalam, Kannada & English movies and web series from 1TamilMV with Torrent & Magnet streaming",
+        "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/TamilMV.cs3",
+        "name": "TamilMV"
+    },
+    {
         "iconUrl": "https://tamilultra.co.uk/wp-content/uploads/2021/05/cropped-LOGO-tamil-ultra-2.png",
         "fileHash": "sha256-3f54aa6d545e70575a7b02d52d0dd90bcb077d1a5356b099388bcfe5355a43c8",
         "apiVersion": 1,
