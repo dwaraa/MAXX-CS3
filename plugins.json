@@ -1,6 +1,6 @@
 [
     {
-        "iconUrl": "https://einthusan.tv/etc/favicon-32x32.png",
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/eithusian.png",
         "fileHash": "sha256-7b40ff975d023eb78388078190442d43ca32b1bbc423f681314b5c06c0c58915",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
@@ -44,7 +44,7 @@
         "name": "SpecialityStream"
     },
     {
-        "iconUrl": "https://uptime.com/media/website_profiles/tamildhool.com.png",
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/Tamildhool.png",
         "fileHash": "sha256-793289f463a3821674efb244d18a84d6cf4fc874fef5efceaa3618d18563c5ee",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
@@ -66,11 +66,11 @@
         "name": "TamilDhool"
     },
     {
-        "iconUrl": "https://www.1tamilmv.capital/uploads/monthly_2020_09/58db8495c66f9_TMVICO.ico.6cbc0c2d9c2e07ae4018a3bb4975bb3e.ico.a8dc71fe3bd3607555703e6f02d85c99.ico",
-        "fileHash": "sha256-e7668d1a74d0a8b46034c715c2bd09b5347910127eae627bbffb16f4351c70e9",
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/tamilmv.png",
+        "fileHash": "sha256-bdba478b79bf20a785abc12d66cd787bd8273c4a0a7b4b281f1faf83653b5617",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
-        "fileSize": 61142,
+        "fileSize": 61449,
         "status": 1,
         "language": "ta",
         "authors": [
