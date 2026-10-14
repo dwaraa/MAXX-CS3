@@ -1,6 +1,6 @@
 [
     {
-        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/eithusian.png",
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/Einthusan/icon.png",
         "fileHash": "sha256-7b40ff975d023eb78388078190442d43ca32b1bbc423f681314b5c06c0c58915",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
@@ -44,7 +44,7 @@
         "name": "SpecialityStream"
     },
     {
-        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/Tamildhool.png",
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/TamilDhool/icon.png",
         "fileHash": "sha256-793289f463a3821674efb244d18a84d6cf4fc874fef5efceaa3618d18563c5ee",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
@@ -66,7 +66,7 @@
         "name": "TamilDhool"
     },
     {
-        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/tamilmv.png",
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/TamilMV/icon.png",
         "fileHash": "sha256-bdba478b79bf20a785abc12d66cd787bd8273c4a0a7b4b281f1faf83653b5617",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
@@ -89,7 +89,7 @@
         "name": "TamilMV"
     },
     {
-        "iconUrl": "https://tamilultra.co.uk/wp-content/uploads/2021/05/cropped-LOGO-tamil-ultra-2.png",
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/TamilUltra/icon.png",
         "fileHash": "sha256-3f54aa6d545e70575a7b02d52d0dd90bcb077d1a5356b099388bcfe5355a43c8",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
