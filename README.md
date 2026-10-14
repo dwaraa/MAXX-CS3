@@ -52,3 +52,15 @@ Requirements: **JDK 17** and **Android SDK**.
 
 If some provider streams or sites are restricted by your ISP:
 - In CloudStream, navigate to **Settings** > **Network** > Enable **DNS-over-HTTPS (DoH)** (Cloudflare or Google).
+
+---
+
+## ⚖️ Legal Disclaimer
+
+This repository and the plugins provided herein are intended strictly for educational, research, and personal archival purposes. 
+
+- **No Media Hosting**: This repository does not host, store, archive, or transmit any media files, video streams, torrent data, or copyrighted material on its servers.
+- **Third-Party Content**: All scrapers, extractors, and search results parse and index publicly available content from third-party websites across the internet that are neither owned, operated, nor affiliated with the maintainers of this repository.
+- **DMCA & Copyright**: All trademarks, logos, and copyrights belong to their respective owners. If you believe your copyrighted content is accessible through any third-party links extracted by these tools, please contact the respective third-party hosting service or webmaster directly to request removal.
+- **User Responsibility**: The developers and maintainers assume no liability or responsibility for how users choose to use these extensions or any content accessed through them. Users are solely responsible for ensuring compliance with all local laws and regulations governing media streaming and copyright in their respective jurisdictions.
+
