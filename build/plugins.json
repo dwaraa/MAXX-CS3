@@ -1,6 +1,6 @@
 [
     {
-        "iconUrl": "https://einthusan.tv/etc/favicon-32x32.png",
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/eithusian.png",
         "fileHash": "sha256-7b40ff975d023eb78388078190442d43ca32b1bbc423f681314b5c06c0c58915",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
@@ -44,7 +44,7 @@
         "name": "SpecialityStream"
     },
     {
-        "iconUrl": "https://uptime.com/media/website_profiles/tamildhool.com.png",
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/Tamildhool.png",
         "fileHash": "sha256-793289f463a3821674efb244d18a84d6cf4fc874fef5efceaa3618d18563c5ee",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
@@ -64,6 +64,29 @@
         "description": "Watch latest Tamil TV serials and shows (Sun TV, Vijay TV, Zee Tamil, Colors Tamil, etc.) powered by WordPress REST API",
         "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/TamilDhool.cs3",
         "name": "TamilDhool"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/tamilmv.png",
+        "fileHash": "sha256-bdba478b79bf20a785abc12d66cd787bd8273c4a0a7b4b281f1faf83653b5617",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
+        "fileSize": 61449,
+        "status": 1,
+        "language": "ta",
+        "authors": [
+            "dwaraa",
+            "Cloudstream Community"
+        ],
+        "tvTypes": [
+            "Movie",
+            "TvSeries",
+            "Torrent"
+        ],
+        "version": 1,
+        "internalName": "TamilMV",
+        "description": "Watch & stream Tamil, Telugu, Hindi, Malayalam, Kannada & English movies and web series from 1TamilMV with Torrent & Magnet streaming",
+        "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/TamilMV.cs3",
+        "name": "TamilMV"
     },
     {
         "iconUrl": "https://tamilultra.co.uk/wp-content/uploads/2021/05/cropped-LOGO-tamil-ultra-2.png",

@@ -343,8 +343,11 @@ class TamilMVProvider : MainAPI() {
 
         val displayTitle = tmdb?.getResolvedTitle() ?: cleanTitle
         val resolvedYear = tmdb?.getYear() ?: year
-        val posterCandidate = tmdb?.getPosterUrl(isoLang)
-        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, languages)
+        var posterCandidate = tmdb?.getPosterUrl(isoLang)
+        if (posterCandidate.isNullOrBlank()) {
+            posterCandidate = fetchTopicPoster(href)
+        }
+        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, languages) ?: posterCandidate
 
         return if (isTv) {
             newTvSeriesSearchResponse(displayTitle, href, TvType.TvSeries) {
@@ -376,16 +379,7 @@ class TamilMVProvider : MainAPI() {
         val commentWrap = doc.selectFirst("div[data-role=commentContent], div.cPost_contentWrap")
 
         // Extract scraped poster image from first post
-        val scrapedPoster = commentWrap?.select("img")?.mapNotNull { img ->
-            val src = img.attr("src").ifBlank { img.attr("data-src") }
-            if (src.isBlank()) null else fixUrl(src)
-        }?.firstOrNull { src ->
-            !src.contains("torrent", ignoreCase = true) &&
-                    !src.contains("torrborder", ignoreCase = true) &&
-                    !src.contains("avatar", ignoreCase = true) &&
-                    !src.contains("giphy", ignoreCase = true) &&
-                    !src.endsWith(".gif", ignoreCase = true)
-        }
+        val scrapedPoster = extractPosterFromPost(commentWrap)
 
         // Query TMDB metadata
         val tmdb = try {
@@ -402,7 +396,7 @@ class TamilMVProvider : MainAPI() {
         }
 
         val posterCandidate = tmdb?.getPosterUrl(isoLang) ?: scrapedPoster
-        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, languages)
+        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, languages) ?: posterCandidate ?: scrapedPoster
         val finalBackdrop = tmdb?.getBackdropUrl() ?: scrapedPoster
         val finalLogo = tmdb?.getLogoUrl(isoLang)
         val basePlot = tmdb?.overview?.ifBlank { null }
@@ -571,119 +565,10 @@ class TamilMVProvider : MainAPI() {
         var foundLinks = false
         val seenUrls = mutableSetOf<String>()
 
-        // 1. Process all Magnet links
-        val allMagnets = commentWrap.select("a[href^=magnet:]").mapNotNull { a ->
-            val url = a.attr("href").trim()
-            if (url.isBlank()) null else {
-                val dn = extractQueryParam(url, "dn") ?: ""
-                Triple(a, url, dn)
-            }
-        }
-
         val epPattern = if (targetEp != null) Regex("""(?i)\bEP\s*0*${targetEp}\b""") else null
-        val individualMagnets = if (epPattern != null) {
-            allMagnets.filter { (_, _, dn) ->
-                !dn.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?""")) && epPattern.containsMatchIn(dn)
-            }
-        } else emptyList()
-
-        val magnetsToProcess = if (individualMagnets.isNotEmpty()) {
-            individualMagnets
-        } else {
-            allMagnets
-        }
-
-        val isBatchEpisode = targetEp != null && individualMagnets.isEmpty()
-        val fileIndex = if (targetEp != null) maxOf(0, targetEp - startEp) else 0
-
-        for ((_, magnetUrl, _) in magnetsToProcess) {
-            if (!seenUrls.add(magnetUrl)) continue
-
-            val (linkName, quality) = parseMagnetMetadata(magnetUrl)
-
-            if (isBatchEpisode) {
-                val indexedMagnetUrl = if (magnetUrl.contains("index=")) magnetUrl else "$magnetUrl&index=$fileIndex"
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = "$linkName [Ep $targetEp]",
-                        url = indexedMagnetUrl,
-                        type = ExtractorLinkType.MAGNET
-                    ) {
-                        this.referer = topicUrl
-                        this.quality = quality
-                    }
-                )
-
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = "$linkName (Full Pack)",
-                        url = magnetUrl,
-                        type = ExtractorLinkType.MAGNET
-                    ) {
-                        this.referer = topicUrl
-                        this.quality = quality
-                    }
-                )
-            } else {
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = linkName,
-                        url = magnetUrl,
-                        type = ExtractorLinkType.MAGNET
-                    ) {
-                        this.referer = topicUrl
-                        this.quality = quality
-                    }
-                )
-            }
-            foundLinks = true
-        }
-
-        // 2. Process all Torrent attachment links
-        val torrentLinks = commentWrap.select("a[href*=attachment.php], a[href*=.torrent]")
-        for (a in torrentLinks) {
-            val rawHref = a.attr("href").trim()
-            if (rawHref.isBlank()) continue
-            val torrentUrl = fixUrl(rawHref)
-            if (!seenUrls.add(torrentUrl)) continue
-
-            val torrentText = a.text().trim()
-            val (linkName, quality) = parseTorrentMetadata(torrentText, torrentUrl)
-
-            if (isBatchEpisode) {
-                val indexedTorrentUrl = if (torrentUrl.contains("index=")) torrentUrl else "$torrentUrl#index=$fileIndex"
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = "$linkName [Ep $targetEp]",
-                        url = indexedTorrentUrl,
-                        type = ExtractorLinkType.TORRENT
-                    ) {
-                        this.referer = topicUrl
-                        this.quality = quality
-                    }
-                )
-            } else {
-                callback(
-                    newExtractorLink(
-                        source = name,
-                        name = linkName,
-                        url = torrentUrl,
-                        type = ExtractorLinkType.TORRENT
-                    ) {
-                        this.referer = topicUrl
-                        this.quality = quality
-                    }
-                )
-            }
-            foundLinks = true
-        }
-
-        // 3. Process Direct Links (Cyberloom / MessyCloud / JuicyBits direct video streaming)
         val allATags = commentWrap.select("a")
+
+        // 1. Process and resolve all DIRECT LINKS first
         val directElements = allATags.filter { a ->
             val href = a.attr("href").trim()
             val text = a.text().trim().uppercase()
@@ -698,7 +583,6 @@ class TamilMVProvider : MainAPI() {
             if (rawHref.isBlank()) return@mapNotNull null
             val directUrl = fixUrl(rawHref)
 
-            // Find preceding metadata (torrent attachment or magnet) to determine file name & resolution
             val dIdx = allATags.indexOf(d)
             var nameCandidate = ""
             for (i in (dIdx - 1) downTo 0) {
@@ -721,7 +605,6 @@ class TamilMVProvider : MainAPI() {
                 }
             }
 
-            // If in a TV series, filter by target episode if individual episode releases exist
             if (epPattern != null && nameCandidate.isNotBlank()) {
                 val isRange = nameCandidate.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?"""))
                 if (!isRange && !epPattern.containsMatchIn(nameCandidate)) {
@@ -732,26 +615,32 @@ class TamilMVProvider : MainAPI() {
             directUrl to nameCandidate
         }
 
+        val directResults = mutableListOf<ExtractorLink>()
         if (directCandidates.isNotEmpty()) {
             directCandidates.amap { (directUrl, nameCandidate) ->
                 if (!seenUrls.add(directUrl)) return@amap
 
                 val resolvedUrl = resolveDirectLink(directUrl)
                 if (!resolvedUrl.isNullOrBlank()) {
-                    val (linkName, quality) = formatLinkLabel(nameCandidate, null, prefix = "[Direct]")
-                    val displayName = if (isBatchEpisode) "$linkName [Ep $targetEp]" else linkName
-                    callback(
-                        newExtractorLink(
-                            source = name,
-                            name = displayName,
-                            url = resolvedUrl,
-                            type = ExtractorLinkType.VIDEO
-                        ) {
-                            this.referer = ""
-                            this.quality = quality
-                        }
-                    )
-                    foundLinks = true
+                    val (linkName, quality) = formatLinkLabel(nameCandidate, null, prefix = "Direct")
+                    val displayName = if (targetEp != null && !linkName.contains("[Ep")) "$linkName [Ep $targetEp]" else linkName
+                    val directLink = newExtractorLink(
+                        source = name,
+                        name = displayName,
+                        url = resolvedUrl,
+                        type = ExtractorLinkType.VIDEO
+                    ) {
+                        this.referer = "https://www.messycloud.ink/"
+                        this.headers = mapOf(
+                            "User-Agent" to DEFAULT_USER_AGENT,
+                            "Referer" to "https://www.messycloud.ink/",
+                            "Accept" to "*/*"
+                        )
+                        this.quality = quality
+                    }
+                    synchronized(directResults) {
+                        directResults.add(directLink)
+                    }
                 } else {
                     if (loadExtractor(directUrl, topicUrl, subtitleCallback, callback)) {
                         foundLinks = true
@@ -760,7 +649,105 @@ class TamilMVProvider : MainAPI() {
             }
         }
 
-        // 4. Process any other stream/online embed links (e.g., doodstream, streamtape, mixdrop)
+        // Sort direct links descending by quality (4K -> 1080p -> 720p -> 480p)
+        directResults.sortedByDescending { it.quality }.forEach { link ->
+            callback(link)
+            foundLinks = true
+        }
+
+        // 2. Process all TORRENT / MAGNET links second
+        val allMagnets = commentWrap.select("a[href^=magnet:]").mapNotNull { a ->
+            val url = a.attr("href").trim()
+            if (url.isBlank()) null else {
+                val dn = extractQueryParam(url, "dn") ?: ""
+                Triple(a, url, dn)
+            }
+        }
+
+        val individualMagnets = if (epPattern != null) {
+            allMagnets.filter { (_, _, dn) ->
+                !dn.contains(Regex("""(?i)\bEP\s*\(?\d+\s*[-–]\s*\d+\)?""")) && epPattern.containsMatchIn(dn)
+            }
+        } else emptyList()
+
+        val magnetsToProcess = if (individualMagnets.isNotEmpty()) {
+            individualMagnets
+        } else {
+            allMagnets
+        }
+
+        val isBatchEpisode = targetEp != null && individualMagnets.isEmpty()
+        val fileIndex = if (targetEp != null) maxOf(0, targetEp - startEp) else 0
+
+        val torrentResults = mutableListOf<ExtractorLink>()
+
+        for ((_, magnetUrl, _) in magnetsToProcess) {
+            if (!seenUrls.add(magnetUrl)) continue
+
+            val (linkName, quality) = parseMagnetMetadata(magnetUrl)
+
+            if (isBatchEpisode) {
+                val indexedMagnetUrl = if (magnetUrl.contains("index=")) magnetUrl else "$magnetUrl&index=$fileIndex"
+                torrentResults.add(
+                    newExtractorLink(
+                        source = name,
+                        name = "$linkName [Ep $targetEp]",
+                        url = indexedMagnetUrl,
+                        type = ExtractorLinkType.MAGNET
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
+            } else {
+                torrentResults.add(
+                    newExtractorLink(
+                        source = name,
+                        name = linkName,
+                        url = magnetUrl,
+                        type = ExtractorLinkType.MAGNET
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
+            }
+        }
+
+        // If no magnets exist on the page, fallback to .torrent file attachments
+        if (allMagnets.isEmpty()) {
+            val torrentLinks = commentWrap.select("a[href*=attachment.php], a[href*=.torrent]")
+            for (a in torrentLinks) {
+                val rawHref = a.attr("href").trim()
+                if (rawHref.isBlank()) continue
+                val torrentUrl = fixUrl(rawHref)
+                if (!seenUrls.add(torrentUrl)) continue
+
+                val torrentText = a.text().trim()
+                val (linkName, quality) = parseTorrentMetadata(torrentText, torrentUrl)
+                val displayName = if (isBatchEpisode) "$linkName [Ep $targetEp]" else linkName
+
+                torrentResults.add(
+                    newExtractorLink(
+                        source = name,
+                        name = displayName,
+                        url = torrentUrl,
+                        type = ExtractorLinkType.TORRENT
+                    ) {
+                        this.referer = topicUrl
+                        this.quality = quality
+                    }
+                )
+            }
+        }
+
+        // Sort torrent links descending by quality (4K -> 1080p -> 720p -> 480p)
+        torrentResults.sortedByDescending { it.quality }.forEach { link ->
+            callback(link)
+            foundLinks = true
+        }
+
+        // 3. Process any other stream/online embed links (e.g., doodstream, streamtape, mixdrop)
         val onlineLinks = commentWrap.select("a[href]").filter { a ->
             val href = a.attr("href").trim()
             val text = a.text().trim().uppercase()
@@ -781,6 +768,32 @@ class TamilMVProvider : MainAPI() {
         }
 
         return foundLinks
+    }
+
+    private fun extractPosterFromPost(commentWrap: Element?): String? {
+        if (commentWrap == null) return null
+        return commentWrap.select("img").mapNotNull { img ->
+            val src = img.attr("src").ifBlank { img.attr("data-src") }
+            if (src.isBlank()) null else fixUrl(src)
+        }.firstOrNull { src ->
+            !src.contains("torrborder", ignoreCase = true) &&
+                    !src.contains("utorrent", ignoreCase = true) &&
+                    !src.contains("avatar", ignoreCase = true) &&
+                    !src.contains("giphy", ignoreCase = true) &&
+                    !src.contains("vlcsnap", ignoreCase = true) &&
+                    !src.endsWith(".gif", ignoreCase = true)
+        }
+    }
+
+    private suspend fun fetchTopicPoster(href: String): String? {
+        return try {
+            val res = app.get(href, headers = DEFAULT_HEADERS)
+            val doc = res.document
+            val commentWrap = doc.selectFirst("div[data-role=commentContent], div.cPost_contentWrap")
+            extractPosterFromPost(commentWrap)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private suspend fun resolveDirectLink(directUrl: String): String? {
@@ -839,19 +852,19 @@ class TamilMVProvider : MainAPI() {
             dn
         }
 
-        return formatLinkLabel(decodedDn, xl)
+        return formatLinkLabel(decodedDn, xl, prefix = "Torrent")
     }
 
     private fun parseTorrentMetadata(torrentText: String, torrentUrl: String): Pair<String, Int> {
         val nameCandidate = torrentText.ifBlank { torrentUrl.substringAfterLast("/") }
-        return formatLinkLabel(nameCandidate, null, prefix = "[Torrent]")
+        return formatLinkLabel(nameCandidate, null, prefix = "Torrent")
     }
 
     private fun formatLinkLabel(rawName: String, sizeBytes: Long?, prefix: String? = null): Pair<String, Int> {
         val nameUpper = rawName.uppercase()
 
         val (qualityLabel, quality) = when {
-            nameUpper.contains("2160P") || nameUpper.contains("4K") -> "4K" to Qualities.P2160.value
+            nameUpper.contains("2160P") || nameUpper.contains("4K") || nameUpper.contains("UHD") -> "4K" to Qualities.P2160.value
             nameUpper.contains("1080P") -> "1080p" to Qualities.P1080.value
             nameUpper.contains("720P") -> "720p" to Qualities.P720.value
             nameUpper.contains("480P") -> "480p" to Qualities.P480.value
@@ -859,23 +872,27 @@ class TamilMVProvider : MainAPI() {
         }
 
         val codecs = mutableListOf<String>()
-        if (nameUpper.contains("HEVC") || nameUpper.contains("X265")) codecs.add("HEVC")
-        else if (nameUpper.contains("AVC") || nameUpper.contains("X264")) codecs.add("x264")
+        if (nameUpper.contains("HEVC")) codecs.add("HEVC")
+        else if (nameUpper.contains("X265")) codecs.add("x265")
+        else if (nameUpper.contains("AVC")) codecs.add("AVC")
+        else if (nameUpper.contains("X264")) codecs.add("x264")
 
-        if (nameUpper.contains("DD+5.1") || nameUpper.contains("DDP5.1")) codecs.add("DD+ 5.1")
+        if (nameUpper.contains("DD+5.1") || nameUpper.contains("DD+ 5.1") || nameUpper.contains("DDP5.1")) codecs.add("DD+ 5.1")
         else if (nameUpper.contains("DD5.1") || nameUpper.contains("DD 5.1")) codecs.add("DD 5.1")
         else if (nameUpper.contains("AAC")) codecs.add("AAC")
 
         val sizeStr = if (sizeBytes != null && sizeBytes > 0) {
             val mb = sizeBytes / (1024.0 * 1024.0)
             if (mb >= 1024.0) {
-                String.format("%.2f GB", mb / 1024.0)
+                String.format("%.1f GB", mb / 1024.0)
             } else {
                 String.format("%.0f MB", mb)
             }
         } else {
-            val sizeMatch = Regex("""(?i)\b(\d+(?:\.\d+)?\s*(?:GB|MB))\b""").find(rawName)
-            sizeMatch?.groupValues?.get(1)
+            val sizeMatch = Regex("""(?i)\b(\d+(?:\.\d+)?)\s*(GB|MB)\b""").find(rawName)
+            if (sizeMatch != null) {
+                "${sizeMatch.groupValues[1]} ${sizeMatch.groupValues[2].uppercase()}"
+            } else null
         }
 
         val labelParts = mutableListOf<String>()
@@ -883,8 +900,8 @@ class TamilMVProvider : MainAPI() {
         labelParts.addAll(codecs)
         sizeStr?.let { labelParts.add(it) }
 
-        val prefixStr = if (!prefix.isNullOrBlank()) "$prefix " else ""
-        val finalLabel = "[1TamilMV] $prefixStr" + labelParts.joinToString(" • ")
+        val prefixStr = if (!prefix.isNullOrBlank()) "[$prefix] " else ""
+        val finalLabel = "$prefixStr" + labelParts.joinToString(" • ")
         return finalLabel to quality
     }
 

@@ -6,5 +6,5 @@ cloudstream {
     language = "ta"
     status = 1 // 1: OK, 2: Slow, 3: Beta, 0: Down
     tvTypes = listOf("Movie")
-    iconUrl = "https://einthusan.tv/etc/favicon-32x32.png"
+    iconUrl = "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/eithusian.png"
 }

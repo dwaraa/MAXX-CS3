@@ -59,19 +59,16 @@ object TmdbHelper {
     var posterWorkerUrl: String = "https://posters.devs-10f.workers.dev"
 
     fun getPosterWithLanguage(posterUrl: String?, language: String?): String? {
+        if (posterUrl.isNullOrBlank()) return null
         val langName = language?.trim()?.takeIf { it.isNotBlank() } ?: "Tamil"
         val encodedLang = URLEncoder.encode(langName, "UTF-8")
-        val targetWorkerUrl = if (posterUrl.isNullOrBlank()) {
-            "$posterWorkerUrl/?text=$encodedLang&w=500&h=750&v=2"
+        val cleanUrl = if (posterUrl.startsWith("http")) {
+            posterUrl
         } else {
-            val cleanUrl = if (posterUrl.startsWith("http")) {
-                posterUrl
-            } else {
-                "https://image.tmdb.org/t/p/w500/${posterUrl.removePrefix("/")}"
-            }
-            val encodedTmdb = URLEncoder.encode(cleanUrl, "UTF-8")
-            "$posterWorkerUrl/?tmdb=$encodedTmdb&lang=$encodedLang&text=$encodedLang&v=2"
+            "https://image.tmdb.org/t/p/w500/${posterUrl.removePrefix("/")}"
         }
+        val encodedTmdb = URLEncoder.encode(cleanUrl, "UTF-8")
+        val targetWorkerUrl = "$posterWorkerUrl/?tmdb=$encodedTmdb&lang=$encodedLang&text=$encodedLang&v=2"
 
         return try {
             "https://wsrv.nl/?url=${URLEncoder.encode(targetWorkerUrl, "UTF-8")}&output=webp"

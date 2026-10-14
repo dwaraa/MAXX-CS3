@@ -6,5 +6,5 @@ cloudstream {
     language = "ta"
     status = 1 // 1: OK, 2: Slow, 3: Beta, 0: Down
     tvTypes = listOf("TvSeries", "Movie")
-    iconUrl = "https://uptime.com/media/website_profiles/tamildhool.com.png"
+    iconUrl = "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/png/Tamildhool.png"
 }
