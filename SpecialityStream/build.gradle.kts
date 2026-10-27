@@ -1,7 +1,7 @@
-version = 1
+version = 2
 
 cloudstream {
-    description = "Speciality stream powered by TMDB metadata with VidLink.pro, VidSrc, Embed.su, 2Embed, and multi-embed providers"
+    description = "Speciality stream powered by TMDB metadata with VidLink.pro, VidStuck.cc (multi-server & multi-audio), VidSrc, and multi-embed providers"
     authors = listOf("dwaraa", "Cloudstream Community")
     language = "en"
     status = 1 // 1: OK, 2: Slow, 3: Beta, 0: Down

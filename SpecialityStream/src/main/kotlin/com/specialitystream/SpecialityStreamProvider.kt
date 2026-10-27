@@ -349,7 +349,26 @@ class SpecialityStreamProvider : MainAPI() {
         } catch (_: Throwable) {
         }
 
-        // 2. Multi-Embed Providers (VidSrc, 2Embed, AutoEmbed, MultiEmbed, SmashyStream, MoviesAPI)
+        // 2. VidStuck.cc (Aggregated embed player with multiple servers & multi-language audio dubs)
+        try {
+            val vidstuckSuccess = VidStuckHelper.getStream(
+                tmdbId = passData.tmdbId,
+                imdbId = passData.imdbId,
+                season = passData.season,
+                episode = passData.episode,
+                title = passData.title,
+                year = passData.year,
+                callback = {
+                    callback(it)
+                    foundLinks = true
+                },
+                subtitleCallback = subtitleCallback
+            )
+            if (vidstuckSuccess) foundLinks = true
+        } catch (_: Throwable) {
+        }
+
+        // 3. Multi-Embed Providers (VidSrc, 2Embed, AutoEmbed, MultiEmbed, SmashyStream, MoviesAPI)
         try {
             EmbedExtractors.extractAll(
                 tmdbId = passData.tmdbId,
