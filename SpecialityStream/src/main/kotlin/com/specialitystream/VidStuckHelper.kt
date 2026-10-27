@@ -8,12 +8,20 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.Qualities
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import kotlin.concurrent.thread
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
 
@@ -225,8 +233,8 @@ object VidStuckHelper {
             val decryptedUrl = decryptLink(encryptedLink) ?: return@forEachIndexed
             val rawFullUrl = if (decryptedUrl.startsWith("/")) "$BASE_URL$decryptedUrl" else decryptedUrl
             val linkType = determineLinkType(linkItem.type, rawFullUrl)
-            val fullUrl = if (linkType == ExtractorLinkType.DASH && !rawFullUrl.contains(".mpd")) {
-                if (rawFullUrl.contains("?")) "$rawFullUrl&.mpd" else "$rawFullUrl#.mpd"
+            val fullUrl = if (linkType == ExtractorLinkType.DASH) {
+                VidStuckProxyServer.registerManifest(rawFullUrl)
             } else if (linkType == ExtractorLinkType.M3U8 && !rawFullUrl.contains(".m3u8")) {
                 if (rawFullUrl.contains("?")) "$rawFullUrl&.m3u8" else "$rawFullUrl#.m3u8"
             } else {
@@ -341,8 +349,8 @@ object VidStuckHelper {
             val decryptedUrl = decryptLink(encryptedLink) ?: return@forEach
             val rawFullUrl = if (decryptedUrl.startsWith("/")) "$BASE_URL$decryptedUrl" else decryptedUrl
             val linkType = determineLinkType(linkItem.type, rawFullUrl)
-            val fullUrl = if (linkType == ExtractorLinkType.DASH && !rawFullUrl.contains(".mpd")) {
-                if (rawFullUrl.contains("?")) "$rawFullUrl&.mpd" else "$rawFullUrl#.mpd"
+            val fullUrl = if (linkType == ExtractorLinkType.DASH) {
+                VidStuckProxyServer.registerManifest(rawFullUrl)
             } else if (linkType == ExtractorLinkType.M3U8 && !rawFullUrl.contains(".m3u8")) {
                 if (rawFullUrl.contains("?")) "$rawFullUrl&.m3u8" else "$rawFullUrl#.m3u8"
             } else {
@@ -542,3 +550,124 @@ object VidStuckHelper {
         }
     }
 }
+
+object VidStuckProxyServer {
+    private var serverSocket: ServerSocket? = null
+    private var port: Int = 0
+    private val manifestCache = ConcurrentHashMap<String, ByteArray>()
+    private val manifestUrls = ConcurrentHashMap<String, String>()
+    private val proxyHeaders = mapOf(
+        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Referer" to "https://vidstuck.cc/",
+        "Origin" to "https://vidstuck.cc"
+    )
+
+    @Synchronized
+    fun start(): Int {
+        if (serverSocket != null && !serverSocket!!.isClosed) return port
+        return try {
+            val ss = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+            serverSocket = ss
+            port = ss.localPort
+
+            thread(name = "VidStuckProxyThread", isDaemon = true) {
+                while (!ss.isClosed) {
+                    try {
+                        val client = ss.accept()
+                        thread(isDaemon = true) {
+                            handleClient(client)
+                        }
+                    } catch (_: Throwable) {
+                        break
+                    }
+                }
+            }
+            port
+        } catch (_: Throwable) {
+            -1
+        }
+    }
+
+    fun registerManifest(rawUrl: String): String {
+        val serverPort = start()
+        val fallback = if (rawUrl.contains("?")) "$rawUrl&.mpd" else "$rawUrl#.mpd"
+        if (serverPort <= 0) return fallback
+
+        val id = UUID.randomUUID().toString()
+        manifestUrls[id] = rawUrl
+
+        // Keep cache bounded
+        if (manifestCache.size > 25) {
+            manifestCache.clear()
+        }
+        if (manifestUrls.size > 50) {
+            manifestUrls.clear()
+            manifestUrls[id] = rawUrl
+        }
+
+        return "http://127.0.0.1:$serverPort/manifest.mpd?id=$id"
+    }
+
+    private fun fetchAndSanitize(targetUrl: String): ByteArray? {
+        val fullUrl = if (targetUrl.startsWith("/")) "https://vidstuck.cc$targetUrl" else targetUrl
+        return try {
+            val reqBuilder = okhttp3.Request.Builder().url(fullUrl)
+            proxyHeaders.forEach { (k, v) -> reqBuilder.header(k, v) }
+            val response = app.baseClient.newCall(reqBuilder.build()).execute()
+            if (!response.isSuccessful) return null
+            val rawXml = response.body?.string() ?: return null
+            // Fix unescaped ampersands in XML attribute values (e.g. CloudFront signed parameters)
+            val sanitized = rawXml.replace(Regex("&(?!(?:amp|lt|gt|quot|apos);)"), "&amp;")
+            sanitized.toByteArray(Charsets.UTF_8)
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    private fun handleClient(socket: Socket) {
+        try {
+            socket.use { s ->
+                val reader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
+                val line = reader.readLine() ?: return
+                val parts = line.split(" ")
+                if (parts.size < 2) return
+                val method = parts[0].uppercase()
+                val path = parts[1]
+
+                val id = path.substringAfter("id=").substringBefore("&").substringBefore(" ")
+                var data = manifestCache[id]
+                if (data == null) {
+                    val url = manifestUrls[id]
+                    if (url != null) {
+                        data = fetchAndSanitize(url)
+                        if (data != null) {
+                            manifestCache[id] = data
+                        }
+                    }
+                }
+
+                val out = s.getOutputStream()
+                if (data == null) {
+                    val resp = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    out.write(resp.toByteArray(Charsets.US_ASCII))
+                    out.flush()
+                    return
+                }
+
+                val header = "HTTP/1.1 200 OK\r\n" +
+                        "Content-Type: application/dash+xml\r\n" +
+                        "Content-Length: ${data.size}\r\n" +
+                        "Access-Control-Allow-Origin: *\r\n" +
+                        "Connection: close\r\n\r\n"
+
+                out.write(header.toByteArray(Charsets.US_ASCII))
+                if (method != "HEAD") {
+                    out.write(data)
+                }
+                out.flush()
+            }
+        } catch (_: Throwable) {
+        }
+    }
+}
+
