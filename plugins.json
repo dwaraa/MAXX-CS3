@@ -22,10 +22,10 @@
     },
     {
         "iconUrl": "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.png",
-        "fileHash": "sha256-b9ae1f73fbc5385ee1dec08447ed4d3691940aa1b590b200f4804645c46cc7b6",
+        "fileHash": "sha256-c2bb468ca2fde144d69439b58feeeb89a93f4b5f0cad0f184b767da76aa08d0f",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
-        "fileSize": 100486,
+        "fileSize": 103879,
         "status": 1,
         "language": "en",
         "authors": [
@@ -37,7 +37,7 @@
             "TvSeries",
             "Anime"
         ],
-        "version": 3,
+        "version": 4,
         "internalName": "SpecialityStream",
         "description": "Speciality stream powered by TMDB metadata with VidLink.pro, VidStuck.cc (multi-server & multi-audio), VidSrc, and multi-embed providers",
         "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/SpecialityStream.cs3",
