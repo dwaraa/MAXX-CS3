@@ -200,6 +200,8 @@ object VidStuckHelper {
             server = serverDef.server,
             ts = qwerty.ts ?: System.currentTimeMillis(),
             token = qwerty.token ?: "",
+            season = season,
+            episode = episode,
             title = title,
             year = year,
             releaseDate = releaseDate,
@@ -221,8 +223,15 @@ object VidStuckHelper {
         serverResp.links?.forEachIndexed { idx, linkItem ->
             val encryptedLink = linkItem.link ?: return@forEachIndexed
             val decryptedUrl = decryptLink(encryptedLink) ?: return@forEachIndexed
-            val fullUrl = if (decryptedUrl.startsWith("/")) "$BASE_URL$decryptedUrl" else decryptedUrl
-            val linkType = determineLinkType(linkItem.type, fullUrl)
+            val rawFullUrl = if (decryptedUrl.startsWith("/")) "$BASE_URL$decryptedUrl" else decryptedUrl
+            val linkType = determineLinkType(linkItem.type, rawFullUrl)
+            val fullUrl = if (linkType == ExtractorLinkType.DASH && !rawFullUrl.contains(".mpd")) {
+                if (rawFullUrl.contains("?")) "$rawFullUrl&.mpd" else "$rawFullUrl#.mpd"
+            } else if (linkType == ExtractorLinkType.M3U8 && !rawFullUrl.contains(".m3u8")) {
+                if (rawFullUrl.contains("?")) "$rawFullUrl&.m3u8" else "$rawFullUrl#.m3u8"
+            } else {
+                rawFullUrl
+            }
 
             val dubTag = if (serverDef.dubSupport) " [Original Audio]" else ""
             val mirrorTag = if ((serverResp.links.size) > 1) " (Mirror ${idx + 1})" else ""
@@ -248,8 +257,8 @@ object VidStuckHelper {
             foundAny = true
         }
 
-        // If server supports dubs (like Orion), fetch available audio dub tracks concurrently
-        if (serverDef.dubSupport && !serverResp.dubs.isNullOrEmpty()) {
+        // If server supports dubs (like Orion), fetch available audio dub tracks concurrently reusing the token
+        if (serverDef.dubSupport && !serverResp.dubs.isNullOrEmpty() && !qwerty.token.isNullOrBlank()) {
             val audioDubs = serverResp.dubs.filter {
                 it.type == 0 && it.original != true && !it.lanCode.isNullOrBlank()
             }
@@ -259,6 +268,8 @@ object VidStuckHelper {
                     extractDubTrack(
                         server = serverDef.server,
                         serverName = serverDef.name,
+                        token = qwerty.token,
+                        ts = qwerty.ts ?: System.currentTimeMillis(),
                         dub = dub,
                         tmdbId = tmdbId,
                         mediaType = mediaType,
@@ -284,6 +295,8 @@ object VidStuckHelper {
     private suspend fun extractDubTrack(
         server: String,
         serverName: String,
+        token: String,
+        ts: Long,
         dub: VidStuckDub,
         tmdbId: Long,
         mediaType: String,
@@ -296,13 +309,14 @@ object VidStuckHelper {
         imdbId: String?,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
-        val qwerty = requestQwertyToken(tmdbId, mediaType, server, season, episode) ?: return false
         val baseParams = buildServerParams(
             tmdbId = tmdbId,
             mediaType = mediaType,
             server = server,
-            ts = qwerty.ts ?: System.currentTimeMillis(),
-            token = qwerty.token ?: "",
+            ts = ts,
+            token = token,
+            season = season,
+            episode = episode,
             title = title,
             year = year,
             releaseDate = releaseDate,
@@ -325,8 +339,15 @@ object VidStuckHelper {
         resp.links?.forEach { linkItem ->
             val encryptedLink = linkItem.link ?: return@forEach
             val decryptedUrl = decryptLink(encryptedLink) ?: return@forEach
-            val fullUrl = if (decryptedUrl.startsWith("/")) "$BASE_URL$decryptedUrl" else decryptedUrl
-            val linkType = determineLinkType(linkItem.type, fullUrl)
+            val rawFullUrl = if (decryptedUrl.startsWith("/")) "$BASE_URL$decryptedUrl" else decryptedUrl
+            val linkType = determineLinkType(linkItem.type, rawFullUrl)
+            val fullUrl = if (linkType == ExtractorLinkType.DASH && !rawFullUrl.contains(".mpd")) {
+                if (rawFullUrl.contains("?")) "$rawFullUrl&.mpd" else "$rawFullUrl#.mpd"
+            } else if (linkType == ExtractorLinkType.M3U8 && !rawFullUrl.contains(".m3u8")) {
+                if (rawFullUrl.contains("?")) "$rawFullUrl&.m3u8" else "$rawFullUrl#.m3u8"
+            } else {
+                rawFullUrl
+            }
             val resTag = if (linkItem.resolution != null && linkItem.resolution > 0) " (${linkItem.resolution}p)" else ""
 
             callback(
@@ -368,6 +389,8 @@ object VidStuckHelper {
             server = "subtitle",
             ts = qwerty.ts ?: System.currentTimeMillis(),
             token = qwerty.token ?: "",
+            season = season,
+            episode = episode,
             title = title,
             year = year,
             releaseDate = releaseDate,
@@ -425,6 +448,8 @@ object VidStuckHelper {
         server: String,
         ts: Long,
         token: String,
+        season: Int? = null,
+        episode: Int? = null,
         title: String,
         year: String,
         releaseDate: String,
@@ -443,6 +468,10 @@ object VidStuckHelper {
         sb.append("&$KEY_YEAR=").append(encode(year))
         sb.append("&$KEY_RELEASE_DATE=").append(encode(releaseDate))
 
+        if (mediaType == "tv" && season != null && episode != null) {
+            sb.append("&$KEY_SEASON=").append(encode(season.toString()))
+            sb.append("&$KEY_EPISODE=").append(encode(episode.toString()))
+        }
         if (mediaType == "tv" && !lastAirDate.isNullOrBlank()) {
             sb.append("&$KEY_LAST_AIR_DATE=").append(encode(lastAirDate))
         }

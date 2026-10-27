@@ -1,4 +1,4 @@
-version = 2
+version = 3
 
 cloudstream {
     description = "Speciality stream powered by TMDB metadata with VidLink.pro, VidStuck.cc (multi-server & multi-audio), VidSrc, and multi-embed providers"
