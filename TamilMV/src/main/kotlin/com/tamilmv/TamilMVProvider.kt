@@ -15,7 +15,7 @@ import java.net.URLEncoder
 
 class TamilMVProvider : MainAPI() {
     override var name = "1TamilMV"
-    override var mainUrl = "https://www.1tamilmv.fi"
+    override var mainUrl = "https://www.1tamilmv.style"
     override val supportedTypes = setOf(TvType.Movie, TvType.TvSeries, TvType.Torrent)
     override var lang = "ta"
     override val hasMainPage = true
@@ -795,8 +795,14 @@ class TamilMVProvider : MainAPI() {
                     torrentFilesCache = torrentFilesCache
                 )
 
-                val finalMagnetUrl = if (fileIndex != null && fileIndex > 0) {
-                    if (magnetUrl.contains("?")) "$magnetUrl&index=$fileIndex" else "$magnetUrl?index=$fileIndex"
+                val finalMagnetUrl = if (fileIndex != null && fileIndex >= 0) {
+                    if (magnetUrl.contains("index=")) {
+                        magnetUrl.replace(Regex("""index=\d+"""), "index=$fileIndex")
+                    } else if (magnetUrl.contains("?")) {
+                        "$magnetUrl&index=$fileIndex"
+                    } else {
+                        "$magnetUrl?index=$fileIndex"
+                    }
                 } else {
                     magnetUrl
                 }
@@ -865,8 +871,14 @@ class TamilMVProvider : MainAPI() {
                     torrentFilesCache = torrentFilesCache
                 )
 
-                val finalTorrentUrl = if (fileIndex != null && fileIndex > 0) {
-                    if (torrentUrl.contains("?")) "$torrentUrl&index=$fileIndex" else "$torrentUrl?index=$fileIndex"
+                val finalTorrentUrl = if (fileIndex != null && fileIndex >= 0) {
+                    if (torrentUrl.contains("index=")) {
+                        torrentUrl.replace(Regex("""index=\d+"""), "index=$fileIndex")
+                    } else if (torrentUrl.contains("?")) {
+                        "$torrentUrl&index=$fileIndex"
+                    } else {
+                        "$torrentUrl?index=$fileIndex"
+                    }
                 } else {
                     torrentUrl
                 }
@@ -1096,28 +1108,31 @@ class TamilMVProvider : MainAPI() {
             }
 
             if (files.isNotEmpty()) {
-                // TorrServer sorts all files alphabetically by path and assigns 1-based Id
-                val sortedFiles = files.sorted()
                 val epPattern1 = Regex("""(?i)(?:^|[\s\.\-_\[\(]|S\d+)(?:EP|E)\s*0*${targetEp}(?:[\s\.\-_\]\)]|$)""")
                 val epPattern2 = Regex("""(?i)\b(?:Episode|Ep)\s*0*${targetEp}\b""")
-                val matchedIndex = sortedFiles.indexOfFirst {
-                    !it.contains("sample", ignoreCase = true) && (epPattern1.containsMatchIn(it) || epPattern2.containsMatchIn(it))
-                }.let { if (it != -1) it else sortedFiles.indexOfFirst { f -> epPattern1.containsMatchIn(f) || epPattern2.containsMatchIn(f) } }
+                val matchedIndex = files.indexOfFirst {
+                    !it.contains("sample", ignoreCase = true) && !it.contains(".pad/", ignoreCase = true) &&
+                            (epPattern1.containsMatchIn(it) || epPattern2.containsMatchIn(it))
+                }.let {
+                    if (it != -1) it else files.indexOfFirst { f ->
+                        !f.contains(".pad/", ignoreCase = true) && (epPattern1.containsMatchIn(f) || epPattern2.containsMatchIn(f))
+                    }
+                }
                 if (matchedIndex != -1) {
-                    return matchedIndex + 1
+                    return matchedIndex
                 }
             }
         }
 
-        // 2. Fallback: calculate 1-based index from batch range
+        // 2. Fallback: calculate 0-based index from batch range
         val rangeMatch = Regex("""(?i)\bEP\s*\(?0*(\d+)\s*[-–]\s*0*(\d+)\)?""").find(dn)
         val batchStart = rangeMatch?.groupValues?.get(1)?.toIntOrNull() ?: fallbackStartEp
         val batchEnd = rangeMatch?.groupValues?.get(2)?.toIntOrNull() ?: fallbackEndEp
 
         return if (targetEp in batchStart..batchEnd) {
-            (targetEp - batchStart + 1).coerceAtLeast(1)
+            maxOf(0, targetEp - batchStart)
         } else {
-            1
+            0
         }
     }
 
