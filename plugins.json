@@ -109,5 +109,27 @@
         "description": "Watch Tamil Live TV and Sports Channels (Star Sports, News, Entertainment, Music, Kids) streaming online free",
         "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/TamilUltra.cs3",
         "name": "TamilUltra"
+    },
+    {
+        "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/ZdkSerials/icon.png",
+        "fileHash": "sha256-fd421f73af0d96061f5085885879ea50ee6fb827177d3df1192023c34ddaad2d",
+        "apiVersion": 1,
+        "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
+        "fileSize": 45175,
+        "status": 1,
+        "language": "all",
+        "authors": [
+            "dwaraa",
+            "Cloudstream Community"
+        ],
+        "tvTypes": [
+            "TvSeries",
+            "Movie"
+        ],
+        "version": 1,
+        "internalName": "ZdkSerials",
+        "description": "Watch latest Indian TV serials & reality shows in Tamil, Telugu, Hindi, Kannada, Marathi, and Bengali from ZDK Serials",
+        "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/ZdkSerials.cs3",
+        "name": "ZdkSerials"
     }
 ]
