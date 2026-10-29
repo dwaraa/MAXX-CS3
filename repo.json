@@ -1,7 +1,7 @@
 {
   "name": "MAXX Provider",
   "iconUrl": "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.png",
-  "description": "Cloudstream 3 Provider repository featuring SpecialityStream (TMDB, VidLink, VidSrc), Einthusan (4K UHD & HD), 1TamilMV (Torrents & Magnets), TamilDhool, and TamilUltra",
+  "description": "Cloudstream 3 Provider repository featuring SpecialityStream (TMDB, VidLink, VidSrc), Einthusan (4K UHD & HD), 1TamilMV (Torrents & Magnets), TamilDhool, TamilUltra, and ZDK Serials",
   "manifestVersion": 1,
   "pluginLists": [
     "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/plugins.json"

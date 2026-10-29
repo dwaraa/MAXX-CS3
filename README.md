@@ -12,6 +12,7 @@ Official CloudStream 3 provider repository containing extensions for movies, TV 
 | **1TamilMV** | Movies, Series, Torrents | High-speed torrent & direct link streaming with quality badges and TMDB artwork |
 | **Einthusan** | Movies | South Asian cinema catalog with 4K UHD and 1080p direct streams |
 | **TamilDhool** | TV Serials & Shows | Tamil serials & shows (Sun TV, Vijay TV, Zee Tamil, Colors) via REST API |
+| **ZDK Serials** | TV Serials & Reality Shows | Indian serials & shows (Tamil, Telugu, Hindi, Kannada, Marathi, Bengali) via WordPress REST API & UpBolt/WexioStream |
 | **TamilUltra** | Live TV | Tamil entertainment, news, music, and sports channels |
 
 ---
