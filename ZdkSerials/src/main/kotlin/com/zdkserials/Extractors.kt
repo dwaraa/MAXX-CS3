@@ -3,7 +3,6 @@ package com.zdkserials
 
 import com.lagradost.cloudstream3.SubtitleFile
 import com.lagradost.cloudstream3.app
-import com.lagradost.cloudstream3.utils.AppUtils.parseJson
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.ExtractorLinkType
 import com.lagradost.cloudstream3.utils.M3u8Helper
@@ -201,9 +200,8 @@ object ZdkExtractor {
                 headers = sessionHeaders,
                 requestBody = sessionPayload.toRequestBody(jsonMedia)
             ).text
-            val session = parseJson<WexioWatchSessionResponse>(sessionRes)
-            val sessionId = session.sessionId ?: return false
-            val embedContext = session.embedContextToken ?: initialEmbedContext
+            val sessionId = Regex(""""session_id"\s*:\s*"([^"]+)"""").find(sessionRes)?.groupValues?.get(1) ?: return false
+            val embedContext = Regex(""""embed_context_token"\s*:\s*"([^"]+)"""").find(sessionRes)?.groupValues?.get(1) ?: initialEmbedContext
 
             // Step 3: POST /playback-grant
             val grantHeaders = mutableMapOf(
@@ -223,8 +221,7 @@ object ZdkExtractor {
                 headers = grantHeaders,
                 requestBody = grantPayload.toRequestBody(jsonMedia)
             ).text
-            val grant = parseJson<WexioPlaybackGrantResponse>(grantRes)
-            val hlsUrl = grant.hlsUrl ?: return false
+            val hlsUrl = Regex(""""hls_url"\s*:\s*"([^"]+)"""").find(grantRes)?.groupValues?.get(1) ?: return false
 
             var generated = false
             try {
