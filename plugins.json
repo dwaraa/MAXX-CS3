@@ -112,10 +112,10 @@
     },
     {
         "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/ZdkSerials/icon.png",
-        "fileHash": "sha256-100e6f2be4c11445c6b579aa7b2e6a0c941dc7de492f44ccacf11078f648e951",
+        "fileHash": "sha256-09b3b649e4484469408d3dc29d689fb83772deac2f4631571fa6f9bd6e83ab6a",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
-        "fileSize": 43787,
+        "fileSize": 49566,
         "status": 1,
         "language": "all",
         "authors": [
