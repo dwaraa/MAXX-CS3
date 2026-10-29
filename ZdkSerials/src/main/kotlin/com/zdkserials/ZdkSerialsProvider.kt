@@ -34,38 +34,34 @@ class ZdkSerialsProvider : MainAPI() {
         MainPageData(name = "Dangal TV", data = "channel:dangal-tv", horizontalImages = true),
         MainPageData(name = "Colors Kannada", data = "channel:colors-kannada", horizontalImages = true),
         MainPageData(name = "Zee Kannada", data = "channel:zee-kannada", horizontalImages = true),
-        MainPageData(name = "Star Suvarna", data = "channel:star-suvarna", horizontalImages = true),
         MainPageData(name = "Sun Udaya Kannada", data = "channel:sun-udaya-kannada", horizontalImages = true),
-        MainPageData(name = "Star Pravah", data = "channel:star-pravah", horizontalImages = true),
-        MainPageData(name = "Zee Marathi", data = "channel:zee-marathi", horizontalImages = true),
+        MainPageData(name = "Star Suvarna", data = "channel:star-suvarna", horizontalImages = true),
         MainPageData(name = "Colors Marathi", data = "channel:colors-marathi", horizontalImages = true),
+        MainPageData(name = "Zee Marathi", data = "channel:zee-marathi", horizontalImages = true),
+        MainPageData(name = "Star Pravah", data = "channel:star-pravah", horizontalImages = true),
         MainPageData(name = "Sun Marathi", data = "channel:sun-marathi", horizontalImages = true),
-        MainPageData(name = "Star Jalsha", data = "channel:star-jalsha", horizontalImages = true),
-        MainPageData(name = "Zee Bangla", data = "channel:zee-bangla", horizontalImages = true),
         MainPageData(name = "Colors Bangla", data = "channel:colors-bangla", horizontalImages = true),
+        MainPageData(name = "Zee Bangla", data = "channel:zee-bangla", horizontalImages = true),
+        MainPageData(name = "Star Jalsha", data = "channel:star-jalsha", horizontalImages = true),
         MainPageData(name = "Sun Bangla", data = "channel:sun-bangla", horizontalImages = true),
-        MainPageData(name = "Sun Neo Hindi", data = "channel:sun-neo-hindi", horizontalImages = true),
-        MainPageData(name = "Bigg Boss", data = "channel:bigg-boss", horizontalImages = true)
+        MainPageData(name = "Zee Keralam", data = "channel:zee-keralam", horizontalImages = true),
+        MainPageData(name = "Sun Surya Malayalam", data = "channel:sun-surya-malayalam", horizontalImages = true)
     )
 
     private val defaultHeaders = mapOf(
         "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept" to "application/json, text/plain, */*"
+        "Referer" to "$mainUrl/"
     )
 
     override suspend fun getMainPage(page: Int, request: MainPageRequest): HomePageResponse {
         val reqData = request.data
 
-        // 1. TOP ROW ONLY: Recent Episodes as MOVIE (just like TamilDhool latest episodes)
+        // 1. TOP ROW ONLY: Recent Episodes (playable movies with direct playback, like TamilDhool)
         if (reqData == "recent_episodes") {
             val endpoint = "$mainUrl/wp-json/wp/v2/ps_episode?per_page=40&page=$page&_embed=1"
             val response = try {
                 app.get(endpoint, headers = defaultHeaders)
             } catch (_: Exception) {
-                null
-            }
-
-            if (response == null || response.code !in 200..299) {
                 return newHomePageResponse(
                     listOf(HomePageList(request.name, emptyList(), isHorizontalImages = true)),
                     hasNext = false
@@ -73,9 +69,8 @@ class ZdkSerialsProvider : MainAPI() {
             }
 
             val totalPages = response.headers["X-WP-TotalPages"]?.toIntOrNull()
-                ?: response.headers["x-wp-totalpages"]?.toIntOrNull()
-
             val eps = try { parseJson<List<WpEpisode>>(response.text) } catch (_: Exception) { emptyList() }
+
             val items = eps.mapNotNull { ep ->
                 val link = ep.link ?: return@mapNotNull null
                 val title = ep.cleanTitle
@@ -149,38 +144,31 @@ class ZdkSerialsProvider : MainAPI() {
 
         // 1. Search Shows via REST API (returns clean show series blocks)
         try {
-            val showEndpoint = "$mainUrl/wp-json/wp/v2/ps_tvshow?search=$encoded&_embed=1&per_page=30"
-            val showRes = app.get(showEndpoint, headers = defaultHeaders)
+            val showUrl = "$mainUrl/wp-json/wp/v2/ps_tvshow?search=$encoded&per_page=20&_embed=1"
+            val showRes = app.get(showUrl, headers = defaultHeaders)
             if (showRes.code in 200..299) {
                 val shows = parseJson<List<WpShow>>(showRes.text)
-                shows.forEach { show ->
-                    val link = show.link ?: return@forEach
+                shows.forEach { s ->
+                    val link = s.link ?: return@forEach
                     results.add(
-                        newTvSeriesSearchResponse(show.cleanTitle, link, TvType.TvSeries) {
-                            this.posterUrl = show.posterUrl
+                        newTvSeriesSearchResponse(s.cleanTitle, link, TvType.TvSeries) {
+                            this.posterUrl = s.posterUrl
                         }
                     )
                 }
             }
         } catch (_: Exception) {}
 
-        // 2. Search Episodes via REST API and map to parent show series blocks
+        // 2. Search Episodes via REST API (represented as standalone playable episodes)
         try {
-            val epEndpoint = "$mainUrl/wp-json/wp/v2/ps_episode?search=$encoded&_embed=1&per_page=30"
-            val epRes = app.get(epEndpoint, headers = defaultHeaders)
+            val epUrl = "$mainUrl/wp-json/wp/v2/ps_episode?search=$encoded&per_page=20&_embed=1"
+            val epRes = app.get(epUrl, headers = defaultHeaders)
             if (epRes.code in 200..299) {
                 val eps = parseJson<List<WpEpisode>>(epRes.text)
                 eps.forEach { ep ->
                     val link = ep.link ?: return@forEach
-                    val showUrl = if (link.contains("/season-") && link.contains("/watch/")) {
-                        link.substringBefore("/season-") + "/"
-                    } else {
-                        link
-                    }
-                    val showTitle = ep.cleanTitle.replace(Regex("""\s*(?:Episode|Ep|E)\s*\d+.*""", RegexOption.IGNORE_CASE), "").trim()
-                        .ifBlank { ep.cleanTitle }
                     results.add(
-                        newTvSeriesSearchResponse(showTitle, showUrl, TvType.TvSeries) {
+                        newMovieSearchResponse(ep.cleanTitle, link, TvType.Movie) {
                             this.posterUrl = ep.posterUrl
                         }
                     )
@@ -188,23 +176,33 @@ class ZdkSerialsProvider : MainAPI() {
             }
         } catch (_: Exception) {}
 
-        // 3. Fallback to website search if REST API found nothing
+        // 3. Fallback: Search website HTML if API results were sparse
         if (results.isEmpty()) {
             try {
-                val doc = app.get("$mainUrl/?s=$encoded", headers = defaultHeaders).document
-                doc.select("a.zdk-card, .zdk-card").forEach { card ->
+                val searchHtml = app.get("$mainUrl/?s=$encoded", headers = defaultHeaders).document
+                searchHtml.select("a.zdk-card, .zdk-card").forEach { card ->
                     val link = if (card.tagName() == "a") card.attr("abs:href") else card.selectFirst("a")?.attr("abs:href")
                     if (link.isNullOrBlank()) return@forEach
-                    val title = card.selectFirst(".zdk-ttl")?.text()?.trim()
+                    val cardTitle = card.selectFirst(".zdk-ttl")?.text()?.trim()
                         ?: card.selectFirst("h3")?.text()?.trim()
                         ?: card.text().trim()
                     val poster = card.selectFirst("img")?.attr("abs:src")
                         ?: card.selectFirst("img")?.attr("src")
-                    results.add(
-                        newTvSeriesSearchResponse(title, link, TvType.TvSeries) {
-                            this.posterUrl = poster
-                        }
-                    )
+
+                    val isShow = link.contains("/show/") && !link.contains("/watch/")
+                    if (isShow) {
+                        results.add(
+                            newTvSeriesSearchResponse(cardTitle, link, TvType.TvSeries) {
+                                this.posterUrl = poster
+                            }
+                        )
+                    } else {
+                        results.add(
+                            newMovieSearchResponse(cardTitle, link, TvType.Movie) {
+                                this.posterUrl = poster
+                            }
+                        )
+                    }
                 }
             } catch (_: Exception) {}
         }
@@ -212,21 +210,29 @@ class ZdkSerialsProvider : MainAPI() {
         return results.distinctBy { it.url }
     }
 
+    override suspend fun quickSearch(query: String): List<SearchResponse> = search(query)
+
     override suspend fun load(url: String): LoadResponse {
         val cleanUrl = if (url.endsWith("/")) url else "$url/"
 
-        // 1. If clicked an individual episode from top row (recent_episodes): load as Movie
-        if (cleanUrl.contains("/watch/")) {
-            val doc = app.get(cleanUrl, headers = defaultHeaders).document
-            val rawTitle = doc.selectFirst("h1")?.text()?.trim()
-                ?: doc.selectFirst("meta[property=og:title]")?.attr("content")
-                ?: "Episode"
-            val cleanTitle = rawTitle.removeSuffix("- ZDK Serials").replace('–', '-').trim()
-            val poster = doc.selectFirst("meta[property=og:image]")?.attr("content")
-                ?: doc.selectFirst(".zdk-wrap img")?.attr("abs:src")
-                ?: doc.selectFirst("img")?.attr("abs:src")
-            val plot = doc.selectFirst("meta[property=og:description]")?.attr("content")
+        // 1. If direct episode watch URL (e.g. from Recent Episodes or search)
+        if (cleanUrl.contains("/watch/") || Regex("""/season-\d+/\d+/""").containsMatchIn(cleanUrl)) {
+            val doc = try {
+                app.get(cleanUrl, headers = defaultHeaders).document
+            } catch (_: Exception) {
+                null
+            }
 
+            val title = doc?.selectFirst("h1")?.text()?.trim()
+                ?: doc?.title()?.substringBefore("-")?.trim()
+                ?: "Episode"
+            val poster = doc?.selectFirst("meta[property=og:image]")?.attr("content")
+                ?: doc?.selectFirst(".zdk-show-poster img")?.attr("abs:src")
+            val plot = doc?.selectFirst("meta[property=og:description]")?.attr("content")
+
+            val cleanTitle = title.replace(Regex("""\s+"""), " ").trim()
+
+            // As Movie, Cloudstream opens player directly without season/episode split
             val singleEpisode = newEpisode(cleanUrl) {
                 this.name = cleanTitle
                 this.posterUrl = poster
@@ -240,12 +246,12 @@ class ZdkSerialsProvider : MainAPI() {
             }
         }
 
-        // 2. If channel page URL: load channel
+        // 2. If channel page URL: load channel show cards
         if (cleanUrl.contains("/channel/")) {
             return loadChannel(cleanUrl)
         }
 
-        // 3. Otherwise it is a Show page (e.g. /show/mahanadhi/): load as TvSeries with all episodes like TamilDhool
+        // 3. Show page (e.g. /show/mahanadhi/): load as TvSeries with all series episodes (no seasons, accurate count)
         return loadShow(cleanUrl)
     }
 
@@ -262,92 +268,63 @@ class ZdkSerialsProvider : MainAPI() {
         val showSlug = cleanUrl.trimEnd('/').substringAfterLast('/')
         val episodes = mutableListOf<Episode>()
 
-        // Check for multiple seasons in <select id="zdk-season">
-        val seasonSelect = doc.selectFirst("select#zdk-season")
-        val seasonOptions = seasonSelect?.select("option") ?: emptyList()
+        // 1. Parse any episodes already embedded in initial HTML
+        doc.select("a.zdk-ep").forEach { a ->
+            parseEpisodeLink(a, poster)?.let { episodes.add(it) }
+        }
 
-        if (seasonOptions.size > 1) {
-            val selectedSeasonVal = seasonSelect?.selectFirst("option[selected]")?.attr("value")
-                ?: seasonOptions.firstOrNull()?.attr("value") ?: "1"
-
-            // 1. Parse currently loaded season directly from HTML
-            doc.select("a.zdk-ep").forEach { a ->
-                parseEpisodeLink(a, poster)?.let { episodes.add(it) }
-            }
-
-            // 2. For all other seasons, fetch via admin-ajax
-            val ajaxHeaders = defaultHeaders + mapOf("X-Requested-With" to "XMLHttpRequest")
-            seasonOptions.forEach { opt ->
-                val seasonVal = opt.attr("value")
-                if (seasonVal != selectedSeasonVal && seasonVal.isNotBlank()) {
-                    try {
-                        val formData = mapOf(
-                            "action" to "zdk_load_more",
-                            "offset" to "0",
-                            "show" to showSlug,
-                            "season" to seasonVal,
-                            "order" to "desc"
-                        )
-                        val resText = app.post("$mainUrl/wp-admin/admin-ajax.php", headers = ajaxHeaders, data = formData).text
-                        val res = parseJson<ZdkLoadMoreResponse>(resText)
-                        if (!res.html.isNullOrBlank()) {
-                            val epDoc = Jsoup.parse(res.html, mainUrl)
-                            epDoc.select("a.zdk-ep").forEach { a ->
-                                parseEpisodeLink(a, poster)?.let { episodes.add(it) }
-                            }
+        // 2. Fetch all episodes using zdk_load_more WITHOUT specifying season.
+        // Indian serials do not have true seasons. Querying without season retrieves
+        // all available episodes in chronological descending order and prevents wrong episode counts.
+        val ajaxHeaders = defaultHeaders + mapOf("X-Requested-With" to "XMLHttpRequest")
+        var offset = 0
+        while (offset < 1000) { // Safety cap
+            try {
+                val formData = mapOf(
+                    "action" to "zdk_load_more",
+                    "offset" to offset.toString(),
+                    "show" to showSlug,
+                    "order" to "desc"
+                )
+                val resText = app.post("$mainUrl/wp-admin/admin-ajax.php", headers = ajaxHeaders, data = formData).text
+                val res = parseJson<ZdkLoadMoreResponse>(resText)
+                var batchAdded = 0
+                if (!res.html.isNullOrBlank()) {
+                    val epDoc = Jsoup.parse(res.html, mainUrl)
+                    epDoc.select("a.zdk-ep").forEach { a ->
+                        parseEpisodeLink(a, poster)?.let {
+                            episodes.add(it)
+                            batchAdded++
                         }
-                    } catch (_: Exception) {}
-                }
-            }
-        } else {
-            // Single season: parse episodes directly from page
-            doc.select("a.zdk-ep").forEach { a ->
-                parseEpisodeLink(a, poster)?.let { episodes.add(it) }
-            }
-
-            // If load more button is present, fetch the next batches (offset 40, 80)
-            val loadMoreBtn = doc.selectFirst("#zdk-load-more")
-            if (loadMoreBtn != null) {
-                val ajaxHeaders = defaultHeaders + mapOf("X-Requested-With" to "XMLHttpRequest")
-                val seasonVal = loadMoreBtn.attr("data-season").ifBlank { "1" }
-                for (offset in listOf(40, 80)) {
-                    try {
-                        val formData = mapOf(
-                            "action" to "zdk_load_more",
-                            "offset" to offset.toString(),
-                            "show" to showSlug,
-                            "season" to seasonVal,
-                            "order" to "desc"
-                        )
-                        val resText = app.post("$mainUrl/wp-admin/admin-ajax.php", headers = ajaxHeaders, data = formData).text
-                        val res = parseJson<ZdkLoadMoreResponse>(resText)
-                        if (!res.html.isNullOrBlank()) {
-                            val epDoc = Jsoup.parse(res.html, mainUrl)
-                            epDoc.select("a.zdk-ep").forEach { a ->
-                                parseEpisodeLink(a, poster)?.let { episodes.add(it) }
-                            }
-                        }
-                        if (res.more != true) break
-                    } catch (_: Exception) {
-                        break
                     }
                 }
+                if (res.more != true || batchAdded == 0) break
+                offset += (res.count ?: batchAdded)
+            } catch (_: Exception) {
+                break
             }
         }
 
-        // Fallback: if no episodes found, add a single placeholder episode
-        if (episodes.isEmpty()) {
+        // Deduplicate episodes by watch URL
+        val uniqueEpisodes = episodes.distinctBy { it.data }
+
+        // Fallback: if no episodes found, add watch now button link
+        val finalEpisodes = if (uniqueEpisodes.isEmpty()) {
             val watchNowLink = doc.selectFirst("a.zdk-watchnow")?.attr("abs:href") ?: url
-            episodes.add(
+            listOf(
                 newEpisode(watchNowLink) {
                     this.name = title
                     this.posterUrl = poster
                     this.data = watchNowLink
+                    this.episode = 1
                 }
             )
+        } else {
+            uniqueEpisodes
         }
 
-        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, episodes.distinctBy { it.data }) {
+        // Return TvSeries response without season categorization
+        return newTvSeriesLoadResponse(title, url, TvType.TvSeries, finalEpisodes) {
             this.posterUrl = poster
             this.backgroundPosterUrl = poster
             this.plot = plot
@@ -393,18 +370,43 @@ class ZdkSerialsProvider : MainAPI() {
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // 1. If data is directly an embed URL (e.g. upbolt.to/e/... or wexiostream.com/e/...)
+        if (data.contains("upbolt", ignoreCase = true) || data.contains("wexio", ignoreCase = true)) {
+            return ZdkExtractor.resolveAndExtract(
+                htmlOrUrl = data,
+                baseUrl = mainUrl,
+                subtitleCallback = subtitleCallback,
+                callback = callback
+            )
+        }
+
+        // 2. Fetch watch page HTML
         val htmlContent = try {
             app.get(data, headers = defaultHeaders).text
         } catch (_: Exception) {
             return false
         }
 
-        return ZdkExtractor.resolveAndExtract(
+        // 3. Resolve and extract links with multiple checks (iframes, servers, regex, direct m3u8)
+        val extracted = ZdkExtractor.resolveAndExtract(
             htmlOrUrl = htmlContent,
-            baseUrl = mainUrl,
+            baseUrl = data,
             subtitleCallback = subtitleCallback,
             callback = callback
         )
+
+        if (extracted) return true
+
+        // 4. Fallback: if data was a show page URL where play was clicked directly,
+        // find watch-now or first episode link and extract from it
+        val doc = Jsoup.parse(htmlContent, data)
+        val watchLink = doc.selectFirst("a.zdk-watchnow")?.attr("abs:href")
+            ?: doc.selectFirst("a.zdk-ep")?.attr("abs:href")
+        if (!watchLink.isNullOrBlank() && watchLink != data) {
+            return loadLinks(watchLink, isCasting, subtitleCallback, callback)
+        }
+
+        return false
     }
 
     private fun parseEpisodeLink(a: org.jsoup.nodes.Element, defaultPoster: String?): Episode? {
@@ -420,15 +422,16 @@ class ZdkSerialsProvider : MainAPI() {
             ?: a.selectFirst("img")?.attr("src")
             ?: defaultPoster
 
-        val seasonNum = Regex("""/season-(\d+)/""").find(epHref)?.groupValues?.get(1)?.toIntOrNull() ?: 1
         val epNum = Regex("""/season-\d+/(\d+)/watch/""").find(epHref)?.groupValues?.get(1)?.toIntOrNull()
             ?: Regex("""\b(?:Episode|Ep|E)\s*(\d+)\b""", RegexOption.IGNORE_CASE).find(epName)?.groupValues?.get(1)?.toIntOrNull()
 
+        // NOTE: We deliberately DO NOT set `this.season = ...`!
+        // Leaving season as null tells CloudStream not to create season tabs,
+        // displaying all episodes in a single clean flat series list matching the website.
         return newEpisode(epHref) {
             this.name = displayName
             this.posterUrl = epThumb
             this.data = epHref
-            this.season = seasonNum
             this.episode = epNum
         }
     }
