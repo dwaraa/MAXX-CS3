@@ -347,7 +347,7 @@ class TamilMVProvider : MainAPI() {
         if (posterCandidate.isNullOrBlank()) {
             posterCandidate = fetchTopicPoster(href)
         }
-        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, languages) ?: posterCandidate
+        val finalPoster = TmdbHelper.getPosterWithLanguage(tmdb?.id, posterCandidate, languages, isTv) ?: posterCandidate
 
         return if (isTv) {
             newTvSeriesSearchResponse(displayTitle, href, TvType.TvSeries) {
@@ -396,7 +396,7 @@ class TamilMVProvider : MainAPI() {
         }
 
         val posterCandidate = tmdb?.getPosterUrl(isoLang) ?: scrapedPoster
-        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, languages) ?: posterCandidate ?: scrapedPoster
+        val finalPoster = TmdbHelper.getPosterWithLanguage(tmdb?.id, posterCandidate, languages, isTv) ?: posterCandidate ?: scrapedPoster
         val finalBackdrop = tmdb?.getBackdropUrl() ?: scrapedPoster
         val finalLogo = tmdb?.getLogoUrl(isoLang)
         val basePlot = tmdb?.overview?.ifBlank { null }
