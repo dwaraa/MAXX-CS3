@@ -71,7 +71,7 @@ object TmdbHelper {
         val typeParam = if (isTv) "tv" else "movie"
 
         if (tmdbId != null && tmdbId > 0) {
-            return "$posterWorkerUrl/?tmdb=$tmdbId&type=$typeParam&logo=$isoLang&text=auto&lang=$encodedLang&top=auto&format=webp"
+            return "$posterWorkerUrl/?tmdb=$tmdbId&type=$typeParam&logo=en&text=auto&lang=$encodedLang&top=auto&format=webp"
         }
 
         if (!fallbackPosterUrl.isNullOrBlank()) {

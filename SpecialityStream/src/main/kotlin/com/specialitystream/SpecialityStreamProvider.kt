@@ -93,10 +93,9 @@ class SpecialityStreamProvider : MainAPI() {
         ): String? {
             if (tmdbId != null && tmdbId > 0) {
                 val langName = getDisplayLanguage(language)
-                val isoLang = getIsoLang(language)
                 val encodedLang = URLEncoder.encode(langName, "UTF-8")
                 val typeParam = if (isTv) "tv" else "movie"
-                return "$POSTER_WORKER_URL/?tmdb=$tmdbId&type=$typeParam&logo=$isoLang&text=auto&lang=$encodedLang&top=auto&format=webp"
+                return "$POSTER_WORKER_URL/?tmdb=$tmdbId&type=$typeParam&logo=en&text=auto&lang=$encodedLang&top=auto&format=webp"
             }
             return fallbackPosterUrl
         }

@@ -55,7 +55,7 @@ object TmdbHelper {
         val encodedLang = URLEncoder.encode(langName, "UTF-8")
 
         if (tmdbId != null && tmdbId > 0) {
-            return "$posterWorkerUrl/?tmdb=$tmdbId&type=movie&logo=$isoLang&text=auto&lang=$encodedLang&top=auto&format=webp"
+            return "$posterWorkerUrl/?tmdb=$tmdbId&type=movie&logo=en&text=auto&lang=$encodedLang&top=auto&format=webp"
         }
 
         if (!fallbackPosterUrl.isNullOrBlank()) {

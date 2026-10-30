@@ -1,4 +1,4 @@
-version = 4
+version = 5
 
 cloudstream {
     description = "Watch & stream Tamil, Telugu, Hindi, Malayalam, Kannada & English movies and web series from 1TamilMV with Torrent & Magnet streaming"
