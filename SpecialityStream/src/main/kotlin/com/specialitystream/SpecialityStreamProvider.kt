@@ -17,6 +17,89 @@ class SpecialityStreamProvider : MainAPI() {
     companion object {
         private const val TMDB_API_KEY = "e6333b32409e02a4a6eba6fb7ff866bb"
         private const val TMDB_BASE_URL = "https://api.themoviedb.org/3"
+        private const val POSTER_WORKER_URL = "https://bp-cs3.devs-10f.workers.dev"
+
+        private val ISO_TO_DISPLAY_LANG = mapOf(
+            "ta" to "Tamil",
+            "te" to "Telugu",
+            "hi" to "Hindi",
+            "ml" to "Malayalam",
+            "kn" to "Kannada",
+            "en" to "English",
+            "ja" to "Japanese",
+            "ko" to "Korean",
+            "zh" to "Chinese",
+            "es" to "Spanish",
+            "fr" to "French",
+            "de" to "German",
+            "it" to "Italian",
+            "ru" to "Russian",
+            "pt" to "Portuguese",
+            "tr" to "Turkish",
+            "ar" to "Arabic",
+            "bn" to "Bengali",
+            "mr" to "Marathi",
+            "pa" to "Punjabi"
+        )
+
+        fun getDisplayLanguage(isoOrName: String?): String {
+            if (isoOrName.isNullOrBlank()) return "English"
+            val trimmed = isoOrName.trim()
+            ISO_TO_DISPLAY_LANG[trimmed.lowercase()]?.let { return it }
+            if (trimmed.length == 2) {
+                try {
+                    val display = java.util.Locale(trimmed.lowercase()).getDisplayLanguage(java.util.Locale.ENGLISH)
+                    if (!display.isNullOrBlank() && !display.equals(trimmed, ignoreCase = true)) {
+                        return display
+                    }
+                } catch (_: Exception) {}
+            }
+            return trimmed.replaceFirstChar { it.uppercase() }
+        }
+
+        fun getIsoLang(isoOrName: String?): String {
+            if (isoOrName.isNullOrBlank()) return "en"
+            val trimmed = isoOrName.trim().lowercase()
+            if (trimmed.length == 2) return trimmed
+            return when (trimmed) {
+                "tamil", "tam" -> "ta"
+                "telugu", "tel" -> "te"
+                "hindi", "hin" -> "hi"
+                "malayalam", "mal" -> "ml"
+                "kannada", "kan" -> "kn"
+                "japanese", "jpn" -> "ja"
+                "korean", "kor" -> "ko"
+                "spanish", "spa" -> "es"
+                "french", "fra", "fre" -> "fr"
+                "german", "ger", "deu" -> "de"
+                "chinese", "zho", "chi" -> "zh"
+                "bengali", "ben" -> "bn"
+                "marathi", "mar" -> "mr"
+                "punjabi", "pan" -> "pa"
+                "russian", "rus" -> "ru"
+                "portuguese", "por" -> "pt"
+                "turkish", "tur" -> "tr"
+                "arabic", "ara" -> "ar"
+                "english", "eng" -> "en"
+                else -> "en"
+            }
+        }
+
+        fun getPosterUrl(
+            tmdbId: Long?,
+            fallbackPosterUrl: String?,
+            language: String?,
+            isTv: Boolean = false
+        ): String? {
+            if (tmdbId != null && tmdbId > 0) {
+                val langName = getDisplayLanguage(language)
+                val isoLang = getIsoLang(language)
+                val encodedLang = URLEncoder.encode(langName, "UTF-8")
+                val typeParam = if (isTv) "tv" else "movie"
+                return "$POSTER_WORKER_URL/?tmdb=$tmdbId&type=$typeParam&logo=$isoLang&text=auto&lang=$encodedLang&top=auto&format=webp"
+            }
+            return fallbackPosterUrl
+        }
     }
 
     private val tmdbHeaders = mapOf(
@@ -117,7 +200,13 @@ class SpecialityStreamProvider : MainAPI() {
             else -> TvType.Movie
         }
 
-        val poster = item.posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
+        val tmdbPoster = item.posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
+        val poster = getPosterUrl(
+            tmdbId = id,
+            fallbackPosterUrl = tmdbPoster,
+            language = item.originalLanguage,
+            isTv = isTv
+        )
         val targetUrl = "$mainUrl/${if (isTv) "tv" else "movie"}/$id"
 
         return if (isTv) {
@@ -159,8 +248,14 @@ class SpecialityStreamProvider : MainAPI() {
         }
 
         val title = detail.title ?: detail.originalTitle ?: "Movie"
-        val poster = detail.posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
-        val backdrop = detail.backdropPath?.let { "https://image.tmdb.org/t/p/original$it" } ?: poster
+        val tmdbPoster = detail.posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
+        val poster = getPosterUrl(
+            tmdbId = tmdbId,
+            fallbackPosterUrl = tmdbPoster,
+            language = detail.originalLanguage,
+            isTv = false
+        )
+        val backdrop = detail.backdropPath?.let { "https://image.tmdb.org/t/p/original$it" } ?: tmdbPoster
         val plot = detail.overview
         val year = detail.releaseDate?.take(4)?.toIntOrNull()
         val runtime = detail.runtime
@@ -229,8 +324,14 @@ class SpecialityStreamProvider : MainAPI() {
         }
 
         val title = detail.name ?: detail.originalName ?: "TV Series"
-        val poster = detail.posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
-        val backdrop = detail.backdropPath?.let { "https://image.tmdb.org/t/p/original$it" } ?: poster
+        val tmdbPoster = detail.posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
+        val poster = getPosterUrl(
+            tmdbId = tmdbId,
+            fallbackPosterUrl = tmdbPoster,
+            language = detail.originalLanguage,
+            isTv = true
+        )
+        val backdrop = detail.backdropPath?.let { "https://image.tmdb.org/t/p/original$it" } ?: tmdbPoster
         val plot = detail.overview
         val year = detail.firstAirDate?.take(4)?.toIntOrNull()
         val tags = detail.genres?.mapNotNull { it.name } ?: emptyList()

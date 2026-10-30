@@ -17,7 +17,8 @@ data class TmdbPageResult(
     @JsonProperty("first_air_date") val firstAirDate: String? = null,
     @JsonProperty("vote_average") val voteAverage: Double? = null,
     @JsonProperty("media_type") val mediaType: String? = null,
-    @JsonProperty("genre_ids") val genreIds: List<Int>? = null
+    @JsonProperty("genre_ids") val genreIds: List<Int>? = null,
+    @JsonProperty("original_language") val originalLanguage: String? = null
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -89,7 +90,8 @@ data class TmdbMovieDetail(
     @JsonProperty("videos") val videos: TmdbVideos? = null,
     @JsonProperty("recommendations") val recommendations: TmdbPageResponse? = null,
     @JsonProperty("external_ids") val externalIds: TmdbExternalIds? = null,
-    @JsonProperty("imdb_id") val imdbId: String? = null
+    @JsonProperty("imdb_id") val imdbId: String? = null,
+    @JsonProperty("original_language") val originalLanguage: String? = null
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -107,7 +109,8 @@ data class TmdbTvDetail(
     @JsonProperty("videos") val videos: TmdbVideos? = null,
     @JsonProperty("recommendations") val recommendations: TmdbPageResponse? = null,
     @JsonProperty("external_ids") val externalIds: TmdbExternalIds? = null,
-    @JsonProperty("seasons") val seasons: List<TmdbSeason>? = null
+    @JsonProperty("seasons") val seasons: List<TmdbSeason>? = null,
+    @JsonProperty("original_language") val originalLanguage: String? = null
 )
 
 @JsonIgnoreProperties(ignoreUnknown = true)
