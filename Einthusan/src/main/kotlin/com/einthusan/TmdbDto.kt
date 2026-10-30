@@ -28,6 +28,7 @@ data class TmdbMovieDetail(
     @JsonProperty("id") val id: Int,
     @JsonProperty("title") val title: String? = null,
     @JsonProperty("original_title") val originalTitle: String? = null,
+    @JsonProperty("original_language") val originalLanguage: String? = null,
     @JsonProperty("overview") val overview: String? = null,
     @JsonProperty("tagline") val tagline: String? = null,
     @JsonProperty("release_date") val releaseDate: String? = null,

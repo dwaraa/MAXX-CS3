@@ -403,7 +403,7 @@ class EinthusanProvider : MainAPI() {
         }
 
         val posterCandidate = tmdb?.getPosterUrl(isoLang) ?: scrapedCover
-        val finalPoster = TmdbHelper.getPosterWithLanguage(posterCandidate, displayLang)
+        val finalPoster = TmdbHelper.getPosterWithLanguage(tmdb?.id, posterCandidate, displayLang)
         val finalBackdrop = tmdb?.getBackdropUrl() ?: scrapedCover
         val finalLogo = tmdb?.getLogoUrl(isoLang)
         val basePlot = tmdb?.overview?.ifBlank { null } ?: scrapedPlot
@@ -514,7 +514,7 @@ class EinthusanProvider : MainAPI() {
                 null
             }
             val posterCandidate = tmdb?.getPosterUrl(isoLang) ?: scrapedCover
-            val finalPosterUrl = TmdbHelper.getPosterWithLanguage(posterCandidate, cardLang)
+            val finalPosterUrl = TmdbHelper.getPosterWithLanguage(tmdb?.id, posterCandidate, cardLang)
 
             newMovieSearchResponse(displayTitle, movieUrl, TvType.Movie) {
                 this.posterUrl = finalPosterUrl

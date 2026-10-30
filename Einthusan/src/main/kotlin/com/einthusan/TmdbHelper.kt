@@ -43,29 +43,31 @@ object TmdbHelper {
         }
     }
 
-    var posterWorkerUrl: String = "https://posters.devs-10f.workers.dev"
+    var posterWorkerUrl: String = "https://bp-cs3.devs-10f.workers.dev"
+
+    fun getPosterWithLanguage(
+        tmdbId: Int?,
+        fallbackPosterUrl: String?,
+        language: String?
+    ): String? {
+        val langName = language?.trim()?.replaceFirstChar { it.uppercase() }?.takeIf { it.isNotBlank() } ?: "Tamil"
+        val isoLang = toIso6391(langName)
+        val encodedLang = URLEncoder.encode(langName, "UTF-8")
+
+        if (tmdbId != null && tmdbId > 0) {
+            return "$posterWorkerUrl/?tmdb=$tmdbId&type=movie&logo=$isoLang&text=auto&lang=$encodedLang&top=auto&format=webp"
+        }
+
+        if (!fallbackPosterUrl.isNullOrBlank()) {
+            return fallbackPosterUrl
+        }
+
+        return "$posterWorkerUrl/?text=$encodedLang&format=webp"
+    }
 
     fun getPosterWithLanguage(posterUrl: String?, language: String?): String? {
-        val langName = language?.trim()?.replaceFirstChar { it.uppercase() }?.takeIf { it.isNotBlank() } ?: "Tamil"
-        val targetWorkerUrl = if (posterUrl.isNullOrBlank()) {
-            val encodedLang = URLEncoder.encode(langName, "UTF-8")
-            "$posterWorkerUrl/?text=$encodedLang&w=500&h=750&v=2"
-        } else {
-            val cleanUrl = if (posterUrl.startsWith("http")) {
-                posterUrl
-            } else {
-                "https://image.tmdb.org/t/p/w500/${posterUrl.removePrefix("/")}"
-            }
-            val encodedTmdb = URLEncoder.encode(cleanUrl, "UTF-8")
-            val encodedLang = URLEncoder.encode(langName, "UTF-8")
-            "$posterWorkerUrl/?tmdb=$encodedTmdb&lang=$encodedLang&v=2"
-        }
-
-        return try {
-            "https://wsrv.nl/?url=${URLEncoder.encode(targetWorkerUrl, "UTF-8")}&output=webp"
-        } catch (_: Exception) {
-            targetWorkerUrl
-        }
+        val tmdbId = posterUrl?.toIntOrNull()
+        return getPosterWithLanguage(tmdbId, posterUrl, language)
     }
 
     private val INDIAN_LANGS = setOf("ta", "te", "hi", "ml", "kn", "bn", "mr", "pa")
@@ -228,9 +230,11 @@ object TmdbHelper {
         api: MainAPI
     ): List<SearchResponse> {
         val recList = detail.recommendations?.results ?: return emptyList()
+        val lang = detail.originalLanguage ?: "Tamil"
         return recList.take(15).mapNotNull { rec ->
             val title = rec.title ?: return@mapNotNull null
-            val poster = rec.posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
+            val fallbackPoster = rec.posterPath?.let { "https://image.tmdb.org/t/p/w500$it" }
+            val poster = getPosterWithLanguage(rec.id, fallbackPoster, lang)
             val searchUrl = "${api.mainUrl}/movie/results/?query=${URLEncoder.encode(title, "UTF-8")}"
             api.newMovieSearchResponse(title, searchUrl, TvType.Movie) {
                 this.posterUrl = poster
