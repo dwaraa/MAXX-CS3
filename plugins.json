@@ -1,10 +1,10 @@
 [
     {
         "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/Einthusan/icon.png",
-        "fileHash": "sha256-867c9220a873162e86804187b28e9ac005e8d02a28f36ac89b1f6d84470f352c",
+        "fileHash": "sha256-907295c9d11d0830d6b849a901ea966f6d7fca5dffb85c0f0d3a22f5cdb5e5cc",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
-        "fileSize": 50682,
+        "fileSize": 50651,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -14,7 +14,7 @@
         "tvTypes": [
             "Movie"
         ],
-        "version": 7,
+        "version": 8,
         "internalName": "Einthusan",
         "description": "Watch South Asian movies with 4K UHD and HD streaming, mapped with TMDB transparent logos, backdrops, trailers, and rich metadata",
         "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/Einthusan.cs3",
@@ -22,10 +22,10 @@
     },
     {
         "iconUrl": "https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_2-d537fb228cf3ded904ef09b136fe3fec72548ebc1fea3fbbd1ad9e36364db38b.png",
-        "fileHash": "sha256-95cb20a3b8ff27ee5080835352fbd35a040a7072db19161a74285898c9a3632b",
+        "fileHash": "sha256-e7dcb61781ec8da4bfd3253252f0b20df0d38d9ee621c2fc3258fafd0761ded6",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
-        "fileSize": 107382,
+        "fileSize": 107359,
         "status": 1,
         "language": "en",
         "authors": [
@@ -37,7 +37,7 @@
             "TvSeries",
             "Anime"
         ],
-        "version": 5,
+        "version": 6,
         "internalName": "SpecialityStream",
         "description": "Speciality stream powered by TMDB metadata with VidLink.pro, VidStuck.cc (multi-server & multi-audio), VidSrc, and multi-embed providers",
         "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/SpecialityStream.cs3",
@@ -67,10 +67,10 @@
     },
     {
         "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/TamilMV/icon.png",
-        "fileHash": "sha256-807d87392a30a04dd7bbf76daa43e8d6971be6792e5b1fde56baeb1927445865",
+        "fileHash": "sha256-4f6c2e188286e37fb58d3302d606099751498ac9f67bdd9f4afa221db7e3dcd0",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
-        "fileSize": 70298,
+        "fileSize": 70282,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -82,7 +82,7 @@
             "TvSeries",
             "Torrent"
         ],
-        "version": 4,
+        "version": 5,
         "internalName": "TamilMV",
         "description": "Watch & stream Tamil, Telugu, Hindi, Malayalam, Kannada & English movies and web series from 1TamilMV with Torrent & Magnet streaming",
         "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/TamilMV.cs3",
