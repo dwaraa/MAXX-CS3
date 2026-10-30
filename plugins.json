@@ -1,10 +1,10 @@
 [
     {
         "iconUrl": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/main/Einthusan/icon.png",
-        "fileHash": "sha256-7b40ff975d023eb78388078190442d43ca32b1bbc423f681314b5c06c0c58915",
+        "fileHash": "sha256-867c9220a873162e86804187b28e9ac005e8d02a28f36ac89b1f6d84470f352c",
         "apiVersion": 1,
         "repositoryUrl": "https://github.com/dwaraa/MAXX-CS3",
-        "fileSize": 50392,
+        "fileSize": 50682,
         "status": 1,
         "language": "ta",
         "authors": [
@@ -14,7 +14,7 @@
         "tvTypes": [
             "Movie"
         ],
-        "version": 6,
+        "version": 7,
         "internalName": "Einthusan",
         "description": "Watch South Asian movies with 4K UHD and HD streaming, mapped with TMDB transparent logos, backdrops, trailers, and rich metadata",
         "url": "https://raw.githubusercontent.com/dwaraa/MAXX-CS3/builds/Einthusan.cs3",
